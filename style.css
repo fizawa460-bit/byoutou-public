@@ -1,0 +1,135 @@
+body {
+  margin: 0;
+  background: #f7f7f7;
+  color: #111;
+  font-family: system-ui, sans-serif;
+}
+
+#game {
+  max-width: 640px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px 20px;
+  box-sizing: border-box;
+}
+
+#title {
+  margin-top: 20vh;
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: 0.15em;
+}
+
+#text {
+  margin-top: 40px;
+  white-space: pre-line;
+  line-height: 1.9;
+  font-size: 18px;
+}
+
+#choices {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#rule-popup {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  width: min(90vw, 420px);
+  padding: 14px 16px;
+  box-sizing: border-box;
+  background: #111;
+  color: #f7f7f7;
+  border: 1px solid #555;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  line-height: 1.6;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 24px);
+  transition: opacity 0.5s ease, transform 0.7s ease;
+}
+
+#rule-popup.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#rule-popup .popup-label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+#rule-popup .popup-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+button {
+  padding: 14px 16px;
+  font-size: 17px;
+  background: white;
+  color: #111;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+  text-align: left;
+}
+
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 17px;
+  background: white;
+  color: #111;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+input:focus {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
+button:active {
+  background: #ddd;
+}
+
+button:disabled {
+  color: #777;
+  background: #eee;
+  border-color: #ccc;
+  cursor: wait;
+}
+
+button:disabled:active {
+  background: #eee;
+}
+
+.dead {
+  background: #050505;
+  color: #eee;
+}
+
+.dead button {
+  background: #111;
+  color: #eee;
+  border-color: #333;
+}
+
+.dead button:disabled {
+  color: #777;
+  background: #080808;
+  border-color: #222;
+}
+
+.dead input {
+  background: #111;
+  color: #eee;
+  border-color: #333;
+}
