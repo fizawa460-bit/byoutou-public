@@ -7,6 +7,7 @@ const TEXT = {
     NAME_PROMPT: "あなたの呼び名を入力してください。",
     NAME_PLACEHOLDER: "〇〇",
     NAME_ARIA_LABEL: "呼び名",
+    CONTENT_WARNING: "この物語は、精神的につらい体験を題材にしています。少し距離を置いて遊んでください。",
     NAME_REGISTERED: (name) => textBlock([
       `${name}ですね。`,
       "登録しました。",

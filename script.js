@@ -1,5 +1,11 @@
 const APP_VERSION = "ver1.21";
 const DEBUG = true;
+const SAVE_VERSION = 1;
+const SAVE_KEYS = {
+  main: "byoutou.save.main",
+  debug: "byoutou.save.debug"
+};
+let saveMode = "main";
 
 // ============================================================
 // script.js 目次
@@ -125,10 +131,169 @@ const title = document.getElementById("title");
 const text = document.getElementById("text");
 const choices = document.getElementById("choices");
 const rulePopup = document.getElementById("rule-popup");
+const contentWarning = document.getElementById("content-warning");
+const saveInspector = document.getElementById("save-inspector");
 
 // ============================================================
 // 2. 画面表示と共通UI
 // ============================================================
+
+function createSaveData() {
+  return {
+    version: SAVE_VERSION,
+    story: {
+      progress: story.progress
+    },
+    flags: {
+      nameRegistered: flags.nameRegistered,
+      metNurseZOnPatrol: flags.metNurseZOnPatrol
+    },
+    counters: {
+      deaths: counters.deaths,
+      waterDeaths: counters.waterDeaths,
+      nurseZDoorTalks: counters.nurseZDoorTalks,
+      mealDeaths: counters.mealDeaths
+    },
+    playerName
+  };
+}
+
+function getDefaultSaveData() {
+  return {
+    version: SAVE_VERSION,
+    story: { progress: STORY.INITIAL_DAY },
+    flags: {
+      nameRegistered: false,
+      metNurseZOnPatrol: false
+    },
+    counters: {
+      deaths: 0,
+      waterDeaths: 0,
+      nurseZDoorTalks: 0,
+      mealDeaths: 0
+    },
+    playerName: "〇〇"
+  };
+}
+
+function normalizeSaveData(data) {
+  if (!data || typeof data !== "object") return null;
+  const defaults = getDefaultSaveData();
+  const nonNegativeInteger = value =>
+    Number.isInteger(value) && value >= 0 ? value : 0;
+
+  return {
+    version: SAVE_VERSION,
+    story: {
+      progress: nonNegativeInteger(data.story?.progress)
+    },
+    flags: {
+      nameRegistered: data.flags?.nameRegistered === true,
+      metNurseZOnPatrol: data.flags?.metNurseZOnPatrol === true
+    },
+    counters: {
+      deaths: nonNegativeInteger(data.counters?.deaths),
+      waterDeaths: nonNegativeInteger(data.counters?.waterDeaths),
+      nurseZDoorTalks: nonNegativeInteger(data.counters?.nurseZDoorTalks),
+      mealDeaths: nonNegativeInteger(data.counters?.mealDeaths)
+    },
+    playerName:
+      typeof data.playerName === "string" && data.playerName.trim()
+        ? data.playerName.slice(0, 12)
+        : defaults.playerName
+  };
+}
+
+function applySaveData(data) {
+  const normalized = normalizeSaveData(data);
+  if (!normalized) return false;
+
+  story.progress = normalized.story.progress;
+  flags.nameRegistered = normalized.flags.nameRegistered;
+  flags.metNurseZOnPatrol = normalized.flags.metNurseZOnPatrol;
+  counters.deaths = normalized.counters.deaths;
+  counters.waterDeaths = normalized.counters.waterDeaths;
+  counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
+  counters.mealDeaths = normalized.counters.mealDeaths;
+  playerName = normalized.playerName;
+
+  flags.loopButtonLocked = false;
+  flags.paperCupPlacedThisLoop = false;
+  counters.hiddenLoopClicks = 0;
+  counters.cleanings = 0;
+  counters.patrols = 0;
+  counters.nurseCalls = 0;
+  pendingDoorNurse = null;
+  return true;
+}
+
+function readSave(slot) {
+  try {
+    const raw = localStorage.getItem(SAVE_KEYS[slot]);
+    if (raw === null) return { status: "missing", data: null };
+    const data = normalizeSaveData(JSON.parse(raw));
+    return data
+      ? { status: "ok", data }
+      : { status: "error", data: null };
+  } catch (error) {
+    console.error("セーブデータを読み込めませんでした。", error);
+    return { status: "error", data: null };
+  }
+}
+
+function loadSave(slot, { resetIfMissing = false } = {}) {
+  const result = readSave(slot);
+  if (result.status === "ok") {
+    applySaveData(result.data);
+    return true;
+  }
+  if (result.status === "missing" && resetIfMissing) {
+    applySaveData(getDefaultSaveData());
+  }
+  return false;
+}
+
+function writeSave(slot) {
+  try {
+    localStorage.setItem(SAVE_KEYS[slot], JSON.stringify(createSaveData()));
+    return true;
+  } catch (error) {
+    console.error("セーブデータを保存できませんでした。", error);
+    return false;
+  }
+}
+
+function deleteSave(slot) {
+  try {
+    localStorage.removeItem(SAVE_KEYS[slot]);
+    return true;
+  } catch (error) {
+    console.error("セーブデータを削除できませんでした。", error);
+    return false;
+  }
+}
+
+function formatSaveSlot(slot, label) {
+  const result = readSave(slot);
+  if (result.status === "missing") return `${label}: 未作成`;
+  if (result.status === "error") return `${label}: 読込エラー`;
+  const data = result.data;
+  return [
+    `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
+    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol}`,
+    `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`
+  ].join("\n");
+}
+
+function refreshSaveInspector() {
+  if (!saveInspector) return;
+  saveInspector.textContent = [
+    formatSaveSlot("main", "MAIN"),
+    formatSaveSlot("debug", "DEBUG")
+  ].join("\n");
+  saveInspector.hidden = false;
+}
+
 
 function advanceStoryProgress(nextProgress) {
   story.progress = Math.max(story.progress, nextProgress);
@@ -148,6 +313,8 @@ function typeText(message, callback) {
   clearInterval(typingTimer);
   text.textContent = "";
   choices.innerHTML = "";
+  contentWarning.hidden = true;
+  if (saveInspector) saveInspector.hidden = true;
   message = formatText(message);
   let i = 0;
   typingTimer = setInterval(() => {
@@ -313,10 +480,21 @@ function setInitialChoices(items) {
 
 // タイトル画面。
 // ゲーム開始前の状態を毎回ここで整える。
-function startTitle() {
+function startTitle({ persist = true } = {}) {
+  if (persist) {
+    writeSave(saveMode);
+    if (saveMode === "debug") {
+      saveMode = "main";
+      loadSave("main", { resetIfMissing: true });
+    }
+  }
+
   document.body.className = "";
+  if (saveInspector) saveInspector.hidden = true;
   title.textContent = getTitleText();
-  text.textContent = `死亡回数: ${counters.deaths}\n`;
+  text.textContent = counters.deaths > 0 ? `死亡回数: ${counters.deaths}\n` : "";
+  contentWarning.textContent = TEXT.UI.CONTENT_WARNING;
+  contentWarning.hidden = false;
   counters.hiddenLoopClicks = 0;
   flags.loopButtonLocked = false;
   const titleChoices = [
@@ -324,7 +502,7 @@ function startTitle() {
     { label: "ルール", action: showRules }
   ];
   if (DEBUG) {
-    titleChoices.push({ label: "デバッグ", action: showDebugMenu });
+    titleChoices.push({ label: "デバッグ", action: openDebugMenu });
   }
   setChoices(titleChoices);
   showQueuedRulePopup();
@@ -332,9 +510,33 @@ function startTitle() {
 
 // 開発用メニュー。
 // 本番ではDEBUGをfalseにすればタイトルから消える。
+function openDebugMenu() {
+  saveMode = "debug";
+  loadSave("debug");
+  debugHistory = [];
+  showDebugMenu();
+}
+
+function loadDebugSaveFromMenu() {
+  loadSave("debug");
+  debugHistory = [];
+  showDebugMenu();
+}
+
+function deleteDebugSaveFromMenu() {
+  deleteSave("debug");
+  showDebugMenu();
+}
+
+function deleteMainSaveFromMenu() {
+  deleteSave("main");
+  showDebugMenu();
+}
+
 function showDebugMenu() {
   document.body.className = "";
   hideRulePopup();
+  contentWarning.hidden = true;
   title.textContent = "デバッグ";
   text.textContent = TEXT.UI.DEBUG_STATUS({
     version: APP_VERSION,
@@ -342,8 +544,10 @@ function showDebugMenu() {
     progress: getStoryProgressLabel(),
     nurseZDoorTalks: counters.nurseZDoorTalks
   });
+  refreshSaveInspector();
   setChoices([
     { label: "初回編", action: showInitialDayIntro },
+
     { label: "白い病室", action: startLoop },
     { label: "ナースコール", action: debugNurseCall },
     { label: "ナースコール2回目", action: debugSecondNurseCall },
@@ -362,7 +566,16 @@ function showDebugMenu() {
     { label: "足運びイベント", action: showFootworkEvent },
     { label: "車イベント", action: showCarEvent },
     { label: "第一部完", action: showSoftRoomAfterFin },
-    { label: "タイトルへ戻る", action: startTitle }
+    { label: "デバッグセーブを読込", action: loadDebugSaveFromMenu, noHistory: true },
+    { label: "デバッグセーブを削除", action: deleteDebugSaveFromMenu, noHistory: true },
+    {
+      label: "正式セーブを削除（長押し）",
+      action: showDebugMenu,
+      holdAction: deleteMainSaveFromMenu,
+      holdMs: 1500,
+      noHistory: true
+    },
+    { label: "タイトルへ戻る", action: startTitle, noHistory: true }
   ]);
 }
 
@@ -429,6 +642,8 @@ function startGame() {
 function showNameInput() {
   document.body.className = "";
   hideRulePopup();
+  contentWarning.hidden = true;
+  if (saveInspector) saveInspector.hidden = true;
   title.textContent = "";
   text.textContent = TEXT.UI.NAME_PROMPT;
   choices.innerHTML = "";
@@ -1792,5 +2007,6 @@ function nextLoop() {
   startTitle();
 }
 
-// 最初にタイトル画面を表示する。
-startTitle();
+// 最後にタイトルで確定した正式セーブだけを起動時に復元する。
+loadSave("main");
+startTitle({ persist: false });

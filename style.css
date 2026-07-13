@@ -34,6 +34,38 @@ body {
   gap: 12px;
 }
 
+#content-warning {
+  width: min(100%, 34em);
+  margin: 28px auto 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.8;
+  text-align: left;
+}
+
+#content-warning[hidden] {
+  display: none;
+}
+
+#save-inspector {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 24px 0 0;
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: #444;
+  background: #f3f3f3;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: left;
+}
+
+#save-inspector[hidden] {
+  display: none;
+}
+
 #rule-popup {
   position: fixed;
   left: 50%;
