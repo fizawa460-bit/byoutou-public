@@ -1,10 +1,33 @@
-const APP_VERSION = "ver1.21";
+const APP_VERSION = "ver1.22";
 const DEBUG = true;
 const SAVE_VERSION = 1;
 const SAVE_KEYS = {
   main: "byoutou.save.main",
   debug: "byoutou.save.debug"
 };
+const ACHIEVEMENTS = [
+  {
+    id: "discharge",
+    name: "退院",
+    lockedImage: "assets/achievements/IA1_discharge_locked.png",
+    unlockedImage: "assets/achievements/IA2_discharge_unlocked.png"
+  },
+  {
+    id: "softRoomClear",
+    name: "ソフト監禁室クリア",
+    lockedImage: "assets/achievements/IB1_soft_room_locked.png",
+    unlockedImage: "assets/achievements/IB2_soft_room_unlocked.png"
+  },
+  ...Array.from({ length: 8 }, (_, index) => ({
+    id: `unknown${index + 1}`,
+    name: "？？？",
+    lockedImage: "assets/achievements/IZ9_unknown.png",
+    unlockedImage: "assets/achievements/IZ9_unknown.png",
+    placeholder: true
+  }))
+];
+const unlockedAchievementIds = new Set();
+const seenTextIds = new Set();
 let saveMode = "main";
 
 // ============================================================
@@ -154,6 +177,8 @@ function createSaveData() {
       nurseZDoorTalks: counters.nurseZDoorTalks,
       mealDeaths: counters.mealDeaths
     },
+    achievements: [...unlockedAchievementIds],
+    seenTextIds: [...seenTextIds],
     playerName
   };
 }
@@ -172,6 +197,8 @@ function getDefaultSaveData() {
       nurseZDoorTalks: 0,
       mealDeaths: 0
     },
+    achievements: [],
+    seenTextIds: [],
     playerName: "〇〇"
   };
 }
@@ -197,6 +224,16 @@ function normalizeSaveData(data) {
       nurseZDoorTalks: nonNegativeInteger(data.counters?.nurseZDoorTalks),
       mealDeaths: nonNegativeInteger(data.counters?.mealDeaths)
     },
+    achievements: Array.isArray(data.achievements)
+      ? data.achievements.filter(id =>
+          ACHIEVEMENTS.some(item => item.id === id && !item.placeholder)
+        )
+      : [],
+    seenTextIds: Array.isArray(data.seenTextIds)
+      ? [...new Set(data.seenTextIds.filter(id =>
+          typeof id === "string" && /^text:[0-9a-f]{8}$/.test(id)
+        ))]
+      : [],
     playerName:
       typeof data.playerName === "string" && data.playerName.trim()
         ? data.playerName.slice(0, 12)
@@ -215,6 +252,10 @@ function applySaveData(data) {
   counters.waterDeaths = normalized.counters.waterDeaths;
   counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
   counters.mealDeaths = normalized.counters.mealDeaths;
+  unlockedAchievementIds.clear();
+  normalized.achievements.forEach(id => unlockedAchievementIds.add(id));
+  seenTextIds.clear();
+  normalized.seenTextIds.forEach(id => seenTextIds.add(id));
   playerName = normalized.playerName;
 
   flags.loopButtonLocked = false;
@@ -281,7 +322,9 @@ function formatSaveSlot(slot, label) {
   return [
     `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
     `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol}`,
-    `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`
+    `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
+    `  achievements=${data.achievements.join(",") || "(none)"}`,
+    `  seenTextIds=${data.seenTextIds.join(",") || "(none)"}`
   ].join("\n");
 }
 
@@ -309,21 +352,59 @@ function getStoryProgressLabel() {
 
 // messageを1文字ずつ表示する。
 // 表示が終わったらcallbackを実行して、選択肢などを出す。
+function getTextReadId(message) {
+  // 本文が変わった場合は新しい文章として扱うため、表示前の本文からIDを作る。
+  let hash = 2166136261;
+  const source = String(message);
+
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `text:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function clearTextSkip() {
+  text.onclick = null;
+  text.classList.remove("is-skippable");
+}
+
 function typeText(message, callback) {
   clearInterval(typingTimer);
+  clearTextSkip();
   text.textContent = "";
   choices.innerHTML = "";
   contentWarning.hidden = true;
   if (saveInspector) saveInspector.hidden = true;
-  message = formatText(message);
-  let i = 0;
+
+  const readId = getTextReadId(message);
+  const canSkip = seenTextIds.has(readId);
+  const formattedMessage = formatText(message);
+  let index = 0;
+  let completed = false;
+
+  const complete = () => {
+    if (completed) return;
+    completed = true;
+    clearInterval(typingTimer);
+    typingTimer = null;
+    text.textContent = formattedMessage;
+    seenTextIds.add(readId);
+    clearTextSkip();
+    if (callback) callback();
+  };
+
+  if (canSkip) {
+    text.classList.add("is-skippable");
+    text.onclick = complete;
+  }
+
   typingTimer = setInterval(() => {
-    text.textContent += message[i];
-    i++;
-    if (i >= message.length) {
-      clearInterval(typingTimer);
-      typingTimer = null;
-      if (callback) callback();
+    text.textContent += formattedMessage[index];
+    index++;
+    if (index >= formattedMessage.length) {
+      complete();
     }
   }, 35);
 }
@@ -366,10 +447,10 @@ function setChoices(items) {
       button.ontouchend = cancelHold;
       button.ontouchcancel = cancelHold;
       button.onclick = () => {
-        if (!holdTriggered) runChoiceAction(item);
+        if (!holdTriggered) runChoiceAction(item, button);
       };
     } else {
-      button.onclick = () => runChoiceAction(item);
+      button.onclick = () => runChoiceAction(item, button);
     }
     choices.appendChild(button);
   });
@@ -381,11 +462,11 @@ function setChoices(items) {
   }
 }
 
-function runChoiceAction(item) {
+function runChoiceAction(item, button) {
   if (DEBUG && !item.noHistory) {
     saveDebugHistory();
   }
-  item.action();
+  item.action(button);
 }
 
 function getDebugStateSnapshot() {
@@ -438,6 +519,7 @@ function restoreDebugHistory() {
   clearTimeout(rulePopupTimer);
   clearTimeout(footworkWaitTimer);
   typingTimer = null;
+  clearTextSkip();
   hideRulePopup();
   restoreDebugStateSnapshot(snapshot.state);
   document.body.className = snapshot.bodyClassName;
@@ -505,7 +587,31 @@ function startTitle({ persist = true } = {}) {
     titleChoices.push({ label: "デバッグ", action: openDebugMenu });
   }
   setChoices(titleChoices);
+  renderAchievementShelf();
   showQueuedRulePopup();
+}
+
+function renderAchievementShelf() {
+  const shelf = document.createElement("div");
+  shelf.id = "achievement-shelf";
+  shelf.setAttribute("aria-label", "実績");
+
+  ACHIEVEMENTS.forEach(achievement => {
+    const unlocked = unlockedAchievementIds.has(achievement.id);
+    const image = document.createElement("img");
+    image.className = "achievement-icon";
+    image.src = unlocked ? achievement.unlockedImage : achievement.lockedImage;
+    image.alt = achievement.placeholder
+      ? "未実装または解除条件不明の実績"
+      : `${achievement.name}（${unlocked ? "解除済み" : "未解除"}）`;
+    image.title = image.alt;
+    image.width = 48;
+    image.height = 48;
+    shelf.appendChild(image);
+  });
+
+  const debugButton = choices.children[2] || null;
+  choices.insertBefore(shelf, debugButton);
 }
 
 // 開発用メニュー。
@@ -705,10 +811,10 @@ function showInitialNurseZLeaves() {
 
 function showInitialDayChoices() {
   setInitialChoices([
-    { label: "窓を見る", action: showInitialWindow },
-    { label: "トイレをする", action: showInitialToilet },
-    { label: "ナースコールを押す", action: showInitialNurseCall },
-    { label: "ねる", action: showInitialBed }
+    { label: TEXT.CHOICE.WINDOW, action: showInitialWindow },
+    { label: TEXT.CHOICE.TOILET, action: showInitialToilet },
+    { label: TEXT.CHOICE.NURSE_CALL, action: showInitialNurseCall },
+    { label: TEXT.CHOICE.SLEEP, action: showInitialBed }
   ]);
 }
 
@@ -733,14 +839,14 @@ function showInitialDinner() {
     TEXT.INITIAL_DAY.DINNER,
     () => {
       setInitialChoices([
-        { label: "食べる", action: showInitialDinnerAfterMeal }
+        { label: TEXT.CHOICE.EAT, action: showInitialDinnerAfterMeal }
       ]);
     }
   );
 }
 
 function showInitialDinnerAfterMeal() {
-  typeText(TEXT.INITIAL_DAY.DINNER_AFTER_MEAL, () => waitForInitialContinue(showInitialWaterChoices, "紙コップを見る"));
+  typeText(TEXT.INITIAL_DAY.DINNER_AFTER_MEAL, () => waitForInitialContinue(showInitialWaterChoices, TEXT.CHOICE.LOOK_PAPER_CUP));
 }
 
 function showInitialWaterChoices() {
@@ -748,8 +854,8 @@ function showInitialWaterChoices() {
     TEXT.INITIAL_DAY.WATER_CHOICES,
     () => {
       setInitialChoices([
-        { label: "水を飲む", action: showInitialDrinkWater },
-        { label: "飲まない", action: showInitialSkipWater }
+        { label: TEXT.CHOICE.DRINK_WATER, action: showInitialDrinkWater },
+        { label: TEXT.CHOICE.DO_NOT_DRINK, action: showInitialSkipWater }
       ]);
     }
   );
@@ -800,7 +906,7 @@ function showInitialDischarge() {
 
 function completeInitialDay() {
   advanceStoryProgress(STORY.SOFT_ROOM.START);
-  unlockAchievement("退院");
+  unlockAchievement("discharge");
   startTitle();
 }
 
@@ -835,13 +941,13 @@ const SCENES = {
   },
   "soft.choices": () => {
     const baseChoices = [
-      { label: "トイレをする", action: () => die("TOILET") },
-      { label: "ナースコールを押す", action: () => goScene("soft.nurseCall") },
-      { label: "ねる", action: () => die("SLEEP") }
+      { label: TEXT.CHOICE.TOILET, action: () => die("TOILET") },
+      { label: TEXT.CHOICE.NURSE_CALL, action: () => goScene("soft.nurseCall") },
+      { label: TEXT.CHOICE.SLEEP, action: () => die("SLEEP") }
     ];
     if (counters.deaths >= 1) {
       baseChoices.push({
-        label: "……",
+        label: TEXT.CHOICE.ELLIPSIS,
         action: handleHiddenLoopButton
       });
     }
@@ -870,8 +976,8 @@ const SCENES = {
   },
   "soft.broadcastChoices": () => {
     setChoices([
-      { label: "返事する", action: () => die("BROADCAST_REPLY") },
-      { label: "返事しない", action: () => goScene("soft.doorKnock") }
+      { label: TEXT.CHOICE.REPLY, action: () => die("BROADCAST_REPLY") },
+      { label: TEXT.CHOICE.DO_NOT_REPLY, action: () => goScene("soft.doorKnock") }
     ]);
   },
   "soft.doorKnock": () => {
@@ -889,8 +995,8 @@ const SCENES = {
         TEXT.SOFT_ROOM.PAPER_CUP_ALREADY,
         () => {
           setChoices([
-            { label: "紙コップを見る", action: () => goScene("soft.water") },
-            { label: "白い病室へ戻る", action: () => goScene("soft.return") }
+            { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
+            { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.return") }
           ]);
         }
       );
@@ -901,8 +1007,8 @@ const SCENES = {
       `${nurseName}「紙コップ置いてませんでしたね。」\n\n水を入れる用のドアから、日付の書かれた紙コップが二つ入れられた。`,
       () => {
         setChoices([
-          { label: "紙コップを見る", action: () => goScene("soft.water") },
-          { label: "白い病室へ戻る", action: () => goScene("soft.return") }
+          { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
+          { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.return") }
         ]);
       }
     );
@@ -929,8 +1035,8 @@ const SCENES = {
   },
   "soft.nightChoices": () => {
     setChoices([
-      { label: "寝る", action: sleepAtNight },
-      { label: "トイレへ移動", action: () => goScene("soft.nightToilet") }
+      { label: TEXT.CHOICE.SLEEP_AT_NIGHT, action: sleepAtNight },
+      { label: TEXT.CHOICE.MOVE_TOILET, action: () => goScene("soft.nightToilet") }
     ]);
   },
   "soft.nightToilet": () => {
@@ -938,9 +1044,9 @@ const SCENES = {
       TEXT.SOFT_ROOM.NIGHT_TOILET_ENTER,
       () => {
         setChoices([
-          { label: "用を足す", action: () => goScene("soft.toiletPaper") },
-          { label: "ドアを見る", action: lookAtDoor },
-          { label: "白い病室へ戻る", action: () => goScene("soft.nightChoices") }
+          { label: TEXT.CHOICE.USE_TOILET, action: () => goScene("soft.toiletPaper") },
+          { label: TEXT.CHOICE.LOOK_DOOR, action: lookAtDoor },
+          { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.nightChoices") }
         ]);
       }
     );
@@ -950,8 +1056,8 @@ const SCENES = {
       TEXT.SOFT_ROOM.TOILET_PAPER,
       () => {
         setChoices([
-          { label: "そのまま流す", action: () => die("TOILET_PAPER_FLUSH") },
-          { label: "細かく砕いて流す", action: () => goScene("soft.cleaningPreview") }
+          { label: TEXT.CHOICE.FLUSH_AS_IS, action: () => die("TOILET_PAPER_FLUSH") },
+          { label: TEXT.CHOICE.BREAK_AND_FLUSH, action: () => goScene("soft.cleaningPreview") }
         ]);
       }
     );
@@ -961,8 +1067,8 @@ const SCENES = {
       TEXT.SOFT_ROOM.CLEANING_PREVIEW,
       () => {
         setChoices([
-          { label: "トイレを磨く", action: () => goScene("soft.cleaningResult") },
-          { label: "布団へ戻る", action: () => die("DARK_ROOM_RETURN") }
+          { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
+          { label: TEXT.CHOICE.RETURN_BED, action: () => die("DARK_ROOM_RETURN") }
         ]);
       }
     );
@@ -973,10 +1079,10 @@ const SCENES = {
       TEXT.SOFT_ROOM.CLEANING_RESULT,
       () => {
         setChoices([
-          { label: "さらに磨く", action: () => goScene("soft.cleaningResult") },
-          { label: "巡回を待つ", action: () => goScene("soft.patrol") },
-          { label: "ドアを見る", action: lookAtDoor },
-          { label: "夜明けを待つ", action: showMorningWarning }
+          { label: TEXT.CHOICE.CLEAN_MORE, action: () => goScene("soft.cleaningResult") },
+          { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
+          { label: TEXT.CHOICE.LOOK_DOOR, action: lookAtDoor },
+          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
         ]);
       }
     );
@@ -994,9 +1100,9 @@ const SCENES = {
       TEXT.SOFT_ROOM.PATROL_SURVIVE(nurse.name),
       () => {
         setChoices([
-          { label: "トイレを磨く", action: () => goScene("soft.cleaningResult") },
-          { label: "巡回を待つ", action: () => goScene("soft.patrol") },
-          { label: "夜明けを待つ", action: showMorningWarning }
+          { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
+          { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
+          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
         ]);
       }
     );
@@ -1014,9 +1120,9 @@ const SCENES = {
       TEXT.SOFT_ROOM.NURSE_Z_MEET,
       () => {
         setChoices([
-          { label: "トイレを磨く", action: () => goScene("soft.cleaningResult") },
-          { label: "巡回を待つ", action: () => goScene("soft.patrol") },
-          { label: "夜明けを待つ", action: showMorningWarning }
+          { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
+          { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
+          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
         ]);
       }
     );
@@ -1026,8 +1132,8 @@ const SCENES = {
       TEXT.SOFT_ROOM.ESCAPE_PROPOSAL,
       () => {
         setChoices([
-          { label: "ドア解除を行う", action: showDoorUnlockEvent },
-          { label: "やめる", action: showMorningWarning }
+          { label: TEXT.CHOICE.UNLOCK_DOOR, action: showDoorUnlockEvent },
+          { label: TEXT.CHOICE.QUIT, action: showMorningWarning }
         ]);
       }
     );
@@ -1053,10 +1159,10 @@ const SCENES = {
     });
     typeText(message, () => {
       setChoices([
-        { label: "押す", action: () => goScene("door.action", { action: "push" }) },
-        { label: "引く", action: () => goScene("door.action", { action: "pull" }) },
-        { label: "待つ", action: () => goScene("door.action", { action: "wait" }) },
-        { label: "Zに合図する", action: () => goScene("door.signal") }
+        { label: TEXT.CHOICE.PUSH, action: () => goScene("door.action", { action: "push" }) },
+        { label: TEXT.CHOICE.PULL, action: () => goScene("door.action", { action: "pull" }) },
+        { label: TEXT.CHOICE.WAIT, action: () => goScene("door.action", { action: "wait" }) },
+        { label: TEXT.CHOICE.SIGNAL_Z, action: () => goScene("door.signal") }
       ]);
     });
   },
@@ -1110,10 +1216,10 @@ const SCENES = {
       patrolText + "\n\n" + TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_PROMPT,
       () => {
         setChoices([
-          { label: "息を止めて", action: () => goScene("door.avoidPatrol", { prefixText: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_SIGNAL }) },
-          { label: "そのまま", action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_STAY }) },
-          { label: "急いで", action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_HURRY }) },
-          { label: "黙る", action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_SILENT }) }
+          { label: TEXT.CHOICE.HOLD_BREATH, action: () => goScene("door.avoidPatrol", { prefixText: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_SIGNAL }) },
+          { label: TEXT.CHOICE.STAY, action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_STAY }) },
+          { label: TEXT.CHOICE.HURRY, action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_HURRY }) },
+          { label: TEXT.CHOICE.SILENT, action: () => goScene("door.fail", { reason: TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_SILENT }) }
         ]);
       }
     );
@@ -1140,9 +1246,9 @@ const SCENES = {
       reason + "\n\n" + TEXT.SOFT_ROOM.DOOR_UNLOCK_FAIL,
       () => {
         setChoices([
-          { label: "トイレを磨く", action: () => goScene("soft.cleaningResult") },
-          { label: "巡回を待つ", action: () => goScene("soft.patrol") },
-          { label: "夜明けを待つ", action: showMorningWarning }
+          { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
+          { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
+          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
         ]);
       }
     );
@@ -1152,8 +1258,8 @@ const SCENES = {
       TEXT.SOFT_ROOM.DOOR_UNLOCK_COMPLETE,
       () => {
         setChoices([
-          { label: "目を閉じる", action: showFootworkEvent },
-          { label: "目を開ける", action: () => die("OPEN_EYES_ESCAPE") }
+          { label: TEXT.CHOICE.CLOSE_EYES, action: showFootworkEvent },
+          { label: TEXT.CHOICE.OPEN_EYES, action: () => die("OPEN_EYES_ESCAPE") }
         ]);
       }
     );
@@ -1177,19 +1283,19 @@ const SCENES = {
     }
     const progress = `${footwork.step}/${footworkRoute.length}`;
     const footworkChoices = [
-      { label: "左前", action: () => goScene("footwork.input", { input: "1" }) },
-      { label: "右前", action: () => goScene("footwork.input", { input: "2" }) },
-      { label: "左後", action: () => goScene("footwork.input", { input: "3" }) },
-      { label: "右後", action: () => goScene("footwork.input", { input: "4" }) }
+      { label: TEXT.CHOICE.LEFT_FORWARD, action: () => goScene("footwork.input", { input: "1" }) },
+      { label: TEXT.CHOICE.RIGHT_FORWARD, action: () => goScene("footwork.input", { input: "2" }) },
+      { label: TEXT.CHOICE.LEFT_BACK, action: () => goScene("footwork.input", { input: "3" }) },
+      { label: TEXT.CHOICE.RIGHT_BACK, action: () => goScene("footwork.input", { input: "4" }) }
     ];
     if (expected === "5" && footwork.unlocked5) {
-      footworkChoices.push({ label: "ジャンプ", action: () => goScene("footwork.input", { input: "5" }) });
+      footworkChoices.push({ label: TEXT.CHOICE.JUMP, action: () => goScene("footwork.input", { input: "5" }) });
     }
     if (expected === "6" && footwork.unlocked6) {
-      footworkChoices.push({ label: "会計お願いします。", action: () => goScene("footwork.input", { input: "6" }) });
+      footworkChoices.push({ label: TEXT.CHOICE.CHECKOUT, action: () => goScene("footwork.input", { input: "6" }) });
     }
     if (expected === "7" && footwork.unlocked7) {
-      footworkChoices.push({ label: "募金はこちらへ。", action: () => goScene("footwork.input", { input: "7" }) });
+      footworkChoices.push({ label: TEXT.CHOICE.DONATION, action: () => goScene("footwork.input", { input: "7" }) });
     }
     typeText(
       TEXT.SOFT_ROOM.FOOTWORK_STATUS(progress),
@@ -1201,10 +1307,10 @@ const SCENES = {
       TEXT.SOFT_ROOM.FOOTWORK_WAIT,
       () => {
         setChoices([
-          { label: "左前", action: failFootworkDuringWait },
-          { label: "右前", action: failFootworkDuringWait },
-          { label: "左後", action: failFootworkDuringWait },
-          { label: "右後", action: failFootworkDuringWait }
+          { label: TEXT.CHOICE.LEFT_FORWARD, action: failFootworkDuringWait },
+          { label: TEXT.CHOICE.RIGHT_FORWARD, action: failFootworkDuringWait },
+          { label: TEXT.CHOICE.LEFT_BACK, action: failFootworkDuringWait },
+          { label: TEXT.CHOICE.RIGHT_BACK, action: failFootworkDuringWait }
         ]);
         clearTimeout(footworkWaitTimer);
         footworkWaitTimer = setTimeout(() => {
@@ -1308,8 +1414,8 @@ function getNextNurseCallResponder() {
 
 function showNurseCallResponderChoices(nurse) {
   setChoices([
-    { label: "話しかける", action: () => talkToNurseCallResponder(nurse) },
-    { label: "返事しない", action: () => waitForDoorNurse(nurse) }
+    { label: TEXT.CHOICE.TALK, action: () => talkToNurseCallResponder(nurse) },
+    { label: TEXT.CHOICE.DO_NOT_REPLY, action: () => waitForDoorNurse(nurse) }
   ]);
 }
 
@@ -1346,8 +1452,8 @@ function showDoorKnock() {
 // 今は会話すると死亡、黙ると紙コップイベントへ進む。
 function showDoorKnockChoices(nurse) {
   setChoices([
-    { label: "会話する", action: () => talkThroughDoor(nurse) },
-    { label: "会話しない", action: () => goScene("soft.paperCup", { nurseName: nurse.name }) }
+    { label: TEXT.CHOICE.CONVERSE, action: () => talkThroughDoor(nurse) },
+    { label: TEXT.CHOICE.DO_NOT_CONVERSE, action: () => goScene("soft.paperCup", { nurseName: nurse.name }) }
   ]);
 }
 
@@ -1393,12 +1499,12 @@ function showWaterEvent() {
 // 何度か調べると「周囲へ撒く」が増える。
 function showWaterChoices() {
   const waterChoices = [
-    { label: "飲む", action: drinkWater },
-    { label: "飲まない", action: refuseWater }
+    { label: TEXT.CHOICE.DRINK, action: drinkWater },
+    { label: TEXT.CHOICE.DO_NOT_DRINK, action: refuseWater }
   ];
   if (counters.waterDeaths > 0) {
     waterChoices.push({
-      label: "周囲へ撒く",
+      label: TEXT.CHOICE.SCATTER_WATER,
       action: scatterWater
     });
   }
@@ -1425,8 +1531,8 @@ function scatterWater() {
     TEXT.SOFT_ROOM.WATER.SCATTER,
     () => {
       setChoices([
-        { label: "線を見続ける", action: () => die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.INVISIBLE_LINE_DEATH }) },
-        { label: "見なかったことにする", action: () => goScene("soft.meal") }
+        { label: TEXT.CHOICE.FOLLOW_LINE, action: () => die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.INVISIBLE_LINE_DEATH }) },
+        { label: TEXT.CHOICE.IGNORE_LINE, action: () => goScene("soft.meal") }
       ]);
     }
   );
@@ -1451,9 +1557,9 @@ function eatMeal() {
 
 function showMealChoices() {
   setChoices([
-    { label: "食べる", action: eatMeal },
-    { label: "食べない", action: refuseMeal },
-    { label: "野菜ジュースだけ飲む", action: () => goScene("soft.nightPreview") }
+    { label: TEXT.CHOICE.EAT, action: eatMeal },
+    { label: TEXT.CHOICE.DO_NOT_EAT, action: refuseMeal },
+    { label: TEXT.CHOICE.VEGETABLE_JUICE, action: () => goScene("soft.nightPreview") }
   ]);
 }
 
@@ -1474,9 +1580,9 @@ function showToothbrushEvent() {
 
 function showToothbrushChoices() {
   setChoices([
-    { label: "気づかないふりをする", action: () => goScene("soft.lightsOut") },
-    { label: "意味を聞く", action: () => die("NURSE_C_MEANING_ASK") },
-    { label: "同じように瞬きする", action: () => goScene("soft.lightsOut") }
+    { label: TEXT.CHOICE.PRETEND_NOT_NOTICE, action: () => goScene("soft.lightsOut") },
+    { label: TEXT.CHOICE.ASK_MEANING, action: () => die("NURSE_C_MEANING_ASK") },
+    { label: TEXT.CHOICE.BLINK_BACK, action: () => goScene("soft.lightsOut") }
   ]);
 }
 
@@ -1542,18 +1648,18 @@ function getPatrolNurse() {
 function showPatrolChoices(nurse) {
   if (nurse.id === "z") {
     setChoices([
-      { label: "話しかける", action: () => talkToPatrolNurse(nurse) },
-      { label: "狂ったふりをする", action: () => goScene("soft.patrolSurvive", { nurse }) },
-      { label: "普通にいる", action: () => goScene("soft.patrolSurvive", { nurse }) },
-      { label: "ドアを見る", action: () => goScene("soft.patrolSurvive", { nurse }) }
+      { label: TEXT.CHOICE.TALK, action: () => talkToPatrolNurse(nurse) },
+      { label: TEXT.CHOICE.ACT_CRAZY, action: () => goScene("soft.patrolSurvive", { nurse }) },
+      { label: TEXT.CHOICE.ACT_NORMAL, action: () => goScene("soft.patrolSurvive", { nurse }) },
+      { label: TEXT.CHOICE.LOOK_DOOR, action: () => goScene("soft.patrolSurvive", { nurse }) }
     ]);
     return;
   }
   setChoices([
-    { label: "話しかける", action: () => talkToPatrolNurse(nurse) },
-    { label: "狂ったふりをする", action: () => goScene("soft.patrolSurvive", { nurse }) },
-    { label: "普通にいる", action: () => die({ type: "PATROL_NORMAL_SURVIVE_FAIL", nurseName: nurse.name }) },
-    { label: "ドアを見る", action: lookAtDoor }
+    { label: TEXT.CHOICE.TALK, action: () => talkToPatrolNurse(nurse) },
+    { label: TEXT.CHOICE.ACT_CRAZY, action: () => goScene("soft.patrolSurvive", { nurse }) },
+    { label: TEXT.CHOICE.ACT_NORMAL, action: () => die({ type: "PATROL_NORMAL_SURVIVE_FAIL", nurseName: nurse.name }) },
+    { label: TEXT.CHOICE.LOOK_DOOR, action: lookAtDoor }
   ]);
 }
 
@@ -1702,7 +1808,7 @@ function showCarApproach() {
 function showCarEvent() {
   typeText(
     TEXT.SOFT_ROOM.CAR_START,
-    () => waitForContinue(showCarRoad1, "進む")
+    () => waitForContinue(showCarRoad1, TEXT.CHOICE.ADVANCE)
   );
 }
 
@@ -1725,9 +1831,9 @@ function showCrosswalkEvent() {
     TEXT.SOFT_ROOM.CROSSWALK,
     () => {
       setChoices([
-        { label: "進む", action: () => die("CROSSWALK_ADVANCE") },
-        { label: "止まる", action: showCrosswalkPassedEvent },
-        { label: "振り返る", action: lookBackInCar }
+        { label: TEXT.CHOICE.ADVANCE, action: () => die("CROSSWALK_ADVANCE") },
+        { label: TEXT.CHOICE.STOP, action: showCrosswalkPassedEvent },
+        { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
       ]);
     }
   );
@@ -1738,9 +1844,9 @@ function showCrosswalkPassedEvent() {
     TEXT.SOFT_ROOM.CROSSWALK_PASSED,
     () => {
       setChoices([
-        { label: "進む", action: showBeforeSignalEvent },
-        { label: "止まる", action: showCarCaughtByStopping },
-        { label: "振り返る", action: lookBackInCar }
+        { label: TEXT.CHOICE.ADVANCE, action: showBeforeSignalEvent },
+        { label: TEXT.CHOICE.STOP, action: showCarCaughtByStopping },
+        { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
       ]);
     }
   );
@@ -1758,9 +1864,9 @@ function showGreenLightEvent() {
     TEXT.SOFT_ROOM.GREEN_LIGHT,
     () => {
       setChoices([
-        { label: "進む", action: () => die("GREEN_LIGHT_CRASH") },
-        { label: "止まる", action: showRedLightEvent },
-        { label: "振り返る", action: lookBackInCar }
+        { label: TEXT.CHOICE.ADVANCE, action: () => die("GREEN_LIGHT_CRASH") },
+        { label: TEXT.CHOICE.STOP, action: showRedLightEvent },
+        { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
       ]);
     }
   );
@@ -1771,9 +1877,9 @@ function showRedLightEvent() {
     TEXT.SOFT_ROOM.RED_LIGHT,
     () => {
       setChoices([
-        { label: "進む", action: showCarTalk1 },
-        { label: "止まる", action: showCarCaughtByStopping },
-        { label: "振り返る", action: lookBackInCar }
+        { label: TEXT.CHOICE.ADVANCE, action: showCarTalk1 },
+        { label: TEXT.CHOICE.STOP, action: showCarCaughtByStopping },
+        { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
       ]);
     }
   );
@@ -1781,9 +1887,9 @@ function showRedLightEvent() {
 
 function setCarDriveChoices(nextAction) {
   setChoices([
-    { label: "進む", action: nextAction },
-    { label: "止まる", action: showCarCaughtByStopping },
-    { label: "振り返る", action: lookBackInCar }
+    { label: TEXT.CHOICE.ADVANCE, action: nextAction },
+    { label: TEXT.CHOICE.STOP, action: showCarCaughtByStopping },
+    { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
   ]);
 }
 
@@ -1818,16 +1924,16 @@ function showCarTalk3() {
 
 function setCarTalkChoices(nextAction) {
   setChoices([
-    { label: "進む", action: nextAction },
-    { label: "止まる", action: showCarCaughtByStopping },
-    { label: "振り返る", action: lookBackInCar }
+    { label: TEXT.CHOICE.ADVANCE, action: nextAction },
+    { label: TEXT.CHOICE.STOP, action: showCarCaughtByStopping },
+    { label: TEXT.CHOICE.LOOK_BACK, action: lookBackInCar }
   ]);
 }
 
 function showCarConversation() {
   typeText(
     TEXT.SOFT_ROOM.CAR_CONVERSATION,
-    () => waitForContinue(showSoftRoomAfterFin, "進む")
+    () => waitForContinue(showSoftRoomAfterFin, TEXT.CHOICE.ADVANCE)
   );
 }
 
@@ -1843,7 +1949,7 @@ function showSoftRoomAfterFin() {
 }
 
 function completeWhiteRoom() {
-  unlockAchievement("白い病室クリア");
+  unlockAchievement("softRoomClear");
   startTitle();
 }
 
@@ -1853,8 +1959,8 @@ function showMorningWarning() {
     TEXT.SOFT_ROOM.MORNING_WARNING,
     () => {
       setChoices([
-        { label: "動かない", action: () => die("MORNING_STILL") },
-        { label: "トイレを磨き続ける", action: () => die("MORNING_CLEANING") }
+        { label: TEXT.CHOICE.DO_NOT_MOVE, action: () => die("MORNING_STILL") },
+        { label: TEXT.CHOICE.KEEP_CLEANING, action: () => die("MORNING_CLEANING") }
       ]);
     }
   );
@@ -1868,13 +1974,16 @@ function showMorningWarning() {
 // TEXT.DEATH のキーまたはオブジェクトを受け取り、表示用文字列を返す。
 function resolveDeathMessage(reason) {
   if (typeof reason === "string") {
-    // キーとして直接参照できる場合
-    if (TEXT.DEATH[reason]) return TEXT.DEATH[reason];
-    
-    // 後方互換: 従来の生の文字列が渡された場合
-    return TEXT.DEATH.GENERIC(reason);
+    if (!TEXT.DEATH[reason]) {
+      throw new Error(`Unknown death key: ${reason}`);
+    }
+    return TEXT.DEATH[reason];
   }
-  
+
+  if (!reason || typeof reason !== "object") {
+    throw new Error("Death reason must be a TEXT.DEATH key or typed object.");
+  }
+
   // オブジェクトでパラメータ付き死亡の場合
   switch (reason.type) {
     case "NORMAL_NURSE_CALL_TALK":
@@ -1895,17 +2004,15 @@ function resolveDeathMessage(reason) {
     case "GENERIC":
       return TEXT.DEATH.GENERIC(reason.reason);
     default:
-      return TEXT.DEATH.GENERIC(String(reason));
+      throw new Error(`Unknown death type: ${reason.type}`);
   }
 }
 
 // 隠し選択肢の処理。
 // 何度か押すと表示が変わり、しばらく待つと死亡ルートとして押せるようになる。
-function handleHiddenLoopButton() {
+function handleHiddenLoopButton(button) {
   if (flags.loopButtonLocked) return;
   counters.hiddenLoopClicks++;
-  const buttons = choices.querySelectorAll("button");
-  const button = buttons[3];
   if (!button) return;
   if (counters.hiddenLoopClicks < 5) {
     button.textContent = "4 " + "……".repeat(counters.hiddenLoopClicks + 1);
@@ -1941,8 +2048,8 @@ function die(reason) {
   const resolved = resolveDeathMessage(reason);
   const message =
     reason === "LOOP_QUESTION"
-      ? TEXT.DEATH.LOOP_QUESTION
-      : resolved.endsWith("\n\n死亡。") ? resolved : resolved + "\n\n死亡。";
+      ? resolved
+      : `${resolved}\n\n死亡。`;
   typeText(message, () => {
     setChoices([
       { label: "タイトルへ戻る", action: nextLoop }
@@ -1962,10 +2069,14 @@ function findRule(id) {
   }
 }
 
-function unlockAchievement(name) {
+function unlockAchievement(id) {
+  const achievement = ACHIEVEMENTS.find(item => item.id === id && !item.placeholder);
+  if (!achievement || unlockedAchievementIds.has(id)) return;
+
+  unlockedAchievementIds.add(id);
   pendingRulePopups.push({
     label: "実績解除",
-    text: name
+    text: achievement.name
   });
 }
 
