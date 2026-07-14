@@ -66,6 +66,8 @@ const TEXT = {
     CONVERSE: "会話する",
     DO_NOT_CONVERSE: "会話しない",
     DRINK: "飲む",
+    DRINK_ANOTHER: "もう一個も飲む",
+    DRINK_NO_MORE: "もう飲まない",
     SCATTER_WATER: "周囲へ撒く",
     FOLLOW_LINE: "線を見続ける",
     IGNORE_LINE: "見なかったことにする",
@@ -286,6 +288,18 @@ const TEXT = {
       LOOK: textBlock([
         "紙コップには、同じ日付が書かれている。",
         "中には水が入っていた。"
+      ]),
+      Z_FIRST_DRINK: textBlock([
+        "水を飲んだ。",
+        "普通の水だ。",
+        "身体には、何も起きなかった。"
+      ]),
+      Z_CUP_HINT: (sequence) => textBlock([
+        "主人公は二つ飲んだカップを、なんとなく重ねた。",
+        "よく見ると、それぞれのコップの淵に文字が書いてあることに気が付いた。",
+        "ぴったり一致する部分を確認すると、数値が書いてあった。",
+        `「${sequence}」`,
+        "なんの数値だろうか……。"
       ]),
       REFUSE: textBlock([
         "紙コップから手を離した。",

@@ -68,6 +68,7 @@ const story = {
 const flags = {
   loopButtonLocked: false,
   paperCupPlacedThisLoop: false,
+  paperCupProviderIdThisLoop: null,
   metNurseZOnPatrol: false,
   nameRegistered: false
 };
@@ -147,6 +148,11 @@ const rules = [
   { id: "enemyLearns", text: "一度通じたやり方が、次も通じるとは限らない。", found: false }
 ];
 
+const doorUnlockActions = [
+  { id: "push", hintNumber: 1, label: TEXT.CHOICE.PUSH },
+  { id: "pull", hintNumber: 2, label: TEXT.CHOICE.PULL },
+  { id: "wait", hintNumber: 3, label: TEXT.CHOICE.WAIT }
+];
 const baseDoorUnlockRoute = ["push", "pull", "wait", "pull", "push", "push"];
 const footworkRoute = ["1", "2", "1", "2", "wait", "1", "2", "3", "3", "1", "1", "5", "1", "4", "2", "2", "2", "1", "2", "6", "7", "1"];
 
@@ -260,6 +266,7 @@ function applySaveData(data) {
 
   flags.loopButtonLocked = false;
   flags.paperCupPlacedThisLoop = false;
+  flags.paperCupProviderIdThisLoop = null;
   counters.hiddenLoopClicks = 0;
   counters.cleanings = 0;
   counters.patrols = 0;
@@ -426,9 +433,24 @@ function setChoices(items) {
     if (item.holdAction) {
       let holdTimer = null;
       let holdTriggered = false;
-      const startHold = () => {
-        holdTriggered = false;
+      let activePointerId = null;
+
+      const clearHold = () => {
         clearTimeout(holdTimer);
+        holdTimer = null;
+      };
+
+      button.style.touchAction = "manipulation";
+      button.oncontextmenu = event => event.preventDefault();
+      button.onpointerdown = event => {
+        if (activePointerId !== null || (event.button !== undefined && event.button !== 0)) {
+          return;
+        }
+        event.preventDefault();
+        activePointerId = event.pointerId;
+        holdTriggered = false;
+        clearHold();
+        button.setPointerCapture?.(event.pointerId);
         holdTimer = setTimeout(() => {
           holdTriggered = true;
           if (DEBUG && !item.noHistory) {
@@ -437,17 +459,20 @@ function setChoices(items) {
           item.holdAction();
         }, item.holdMs || 1200);
       };
-      const cancelHold = () => {
-        clearTimeout(holdTimer);
+      button.onpointerup = event => {
+        if (event.pointerId !== activePointerId) return;
+        event.preventDefault();
+        clearHold();
+        button.releasePointerCapture?.(event.pointerId);
+        activePointerId = null;
+        if (!holdTriggered) {
+          runChoiceAction(item, button);
+        }
       };
-      button.onmousedown = startHold;
-      button.onmouseup = cancelHold;
-      button.onmouseleave = cancelHold;
-      button.ontouchstart = startHold;
-      button.ontouchend = cancelHold;
-      button.ontouchcancel = cancelHold;
-      button.onclick = () => {
-        if (!holdTriggered) runChoiceAction(item, button);
+      button.onpointercancel = event => {
+        if (event.pointerId !== activePointerId) return;
+        clearHold();
+        activePointerId = null;
       };
     } else {
       button.onclick = () => runChoiceAction(item, button);
@@ -985,9 +1010,12 @@ const SCENES = {
     const nurse = pendingDoorNurse || { id: "normal", name: "看護師A" };
     typeText(TEXT.SOFT_ROOM.DOOR_KNOCK(nurse), () => showDoorKnockChoices(nurse));
   },
-  "soft.paperCup": ({ nurseName = "看護師A" } = {}) => {
+  "soft.paperCup": ({ nurseName = "看護師A", nurseId = "normal" } = {}) => {
     if (typeof nurseName !== "string") {
       nurseName = "看護師A";
+    }
+    if (nurseId !== "z") {
+      nurseId = "normal";
     }
     pendingDoorNurse = null;
     if (flags.paperCupPlacedThisLoop) {
@@ -1003,6 +1031,7 @@ const SCENES = {
       return;
     }
     flags.paperCupPlacedThisLoop = true;
+    flags.paperCupProviderIdThisLoop = nurseId;
     typeText(
       `${nurseName}「紙コップ置いてませんでしたね。」\n\n水を入れる用のドアから、日付の書かれた紙コップが二つ入れられた。`,
       () => {
@@ -1014,7 +1043,8 @@ const SCENES = {
     );
   },
   "soft.water": () => {
-    typeText(TEXT.SOFT_ROOM.WATER.LOOK, showWaterChoices);
+    const providedByNurseZ = flags.paperCupProviderIdThisLoop === "z";
+    typeText(TEXT.SOFT_ROOM.WATER.LOOK, () => showWaterChoices(providedByNurseZ));
   },
   "soft.meal": () => {
     const mealText =
@@ -1159,9 +1189,10 @@ const SCENES = {
     });
     typeText(message, () => {
       setChoices([
-        { label: TEXT.CHOICE.PUSH, action: () => goScene("door.action", { action: "push" }) },
-        { label: TEXT.CHOICE.PULL, action: () => goScene("door.action", { action: "pull" }) },
-        { label: TEXT.CHOICE.WAIT, action: () => goScene("door.action", { action: "wait" }) },
+        ...doorUnlockActions.map(({ id, label }) => ({
+          label,
+          action: () => goScene("door.action", { action: id })
+        })),
         { label: TEXT.CHOICE.SIGNAL_Z, action: () => goScene("door.signal") }
       ]);
     });
@@ -1453,7 +1484,7 @@ function showDoorKnock() {
 function showDoorKnockChoices(nurse) {
   setChoices([
     { label: TEXT.CHOICE.CONVERSE, action: () => talkThroughDoor(nurse) },
-    { label: TEXT.CHOICE.DO_NOT_CONVERSE, action: () => goScene("soft.paperCup", { nurseName: nurse.name }) }
+    { label: TEXT.CHOICE.DO_NOT_CONVERSE, action: () => goScene("soft.paperCup", { nurseName: nurse.name, nurseId: nurse.id }) }
   ]);
 }
 
@@ -1479,14 +1510,14 @@ function talkToNurseZAtDoor() {
     "今はまだ、開けられません。";
   typeText(
     `看護師Zは、ドアの向こうで少しだけ声を落とした。\n\n看護師Z「${line}」\n\nそれだけ言って、足音は遠ざかった。\n\n生きている。`,
-    () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z" }))
+    () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z", nurseId: "z" }))
   );
 }
 
 // 日付入り紙コップのイベント。
 // 水イベントや食事イベントへつなぐための仮の到達点。
-function showPaperCupEvent(nurseName = "看護師A") {
-  goScene("soft.paperCup", { nurseName });
+function showPaperCupEvent(nurseName = "看護師A", nurseId = "normal") {
+  goScene("soft.paperCup", { nurseName, nurseId });
 }
 
 // 水イベントの入口。
@@ -1497,9 +1528,9 @@ function showWaterEvent() {
 
 // 水イベントの選択肢。
 // 何度か調べると「周囲へ撒く」が増える。
-function showWaterChoices() {
+function showWaterChoices(providedByNurseZ = false) {
   const waterChoices = [
-    { label: TEXT.CHOICE.DRINK, action: drinkWater },
+    { label: TEXT.CHOICE.DRINK, action: () => drinkWater(providedByNurseZ) },
     { label: TEXT.CHOICE.DO_NOT_DRINK, action: refuseWater }
   ];
   if (counters.waterDeaths > 0) {
@@ -1511,11 +1542,28 @@ function showWaterChoices() {
   setChoices(waterChoices);
 }
 
-// 水を飲むと死亡する。
-function drinkWater() {
-  findRule("doNotDrinkWater");
-  counters.waterDeaths++;
-  die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.DRINK_DEATH });
+// 看護師Zが置いた水だけは安全で、二杯目からドア解除のヒントを得られる。
+function drinkWater(providedByNurseZ = false) {
+  if (!providedByNurseZ) {
+    findRule("doNotDrinkWater");
+    counters.waterDeaths++;
+    die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.DRINK_DEATH });
+    return;
+  }
+
+  typeText(TEXT.SOFT_ROOM.WATER.Z_FIRST_DRINK, () => {
+    setChoices([
+      { label: TEXT.CHOICE.DRINK_ANOTHER, action: drinkSecondNurseZWater },
+      { label: TEXT.CHOICE.DRINK_NO_MORE, action: () => goScene("soft.meal") }
+    ]);
+  });
+}
+
+function drinkSecondNurseZWater() {
+  typeText(
+    TEXT.SOFT_ROOM.WATER.Z_CUP_HINT(getDoorUnlockHintSequence()),
+    () => waitForContinue(() => goScene("soft.meal"))
+  );
 }
 
 // 飲まない場合は、いったん食事イベントへ進む。
@@ -1697,6 +1745,16 @@ function showEscapeProposal() {
 
 function showDoorUnlockEvent() {
   goScene("door.start");
+}
+
+function getDoorUnlockHintSequence(route = baseDoorUnlockRoute) {
+  return route.map(actionId => {
+    const action = doorUnlockActions.find(item => item.id === actionId);
+    if (!action) {
+      throw new Error(`Unknown door unlock action: ${actionId}`);
+    }
+    return action.hintNumber;
+  }).join(",");
 }
 
 function getDoorUnlockRoute() {
@@ -2114,6 +2172,7 @@ function hideRulePopup() {
 function nextLoop() {
   counters.deaths++;
   flags.paperCupPlacedThisLoop = false;
+  flags.paperCupProviderIdThisLoop = null;
   counters.cleanings = 0;
   startTitle();
 }
