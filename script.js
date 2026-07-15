@@ -12,7 +12,8 @@ const TRIAL_CLOCK_CONFIG = {
   enabled: true,
   showDay: true,
   startHour: 9,
-  hoursPerAction: 1
+  startMinute: 0,
+  minutesPerAction: 30
 };
 const ACHIEVEMENTS = [
   {
@@ -105,7 +106,8 @@ const deathCauseCounts = {};
 const trialClock = {
   active: false,
   day: 1,
-  hour: TRIAL_CLOCK_CONFIG.startHour
+  hour: TRIAL_CLOCK_CONFIG.startHour,
+  minute: TRIAL_CLOCK_CONFIG.startMinute
 };
 
 // セリフ本文は texts.js に分離。
@@ -189,7 +191,9 @@ const trialClockDisplay = document.getElementById("trial-clock");
 // ============================================================
 
 function formatTrialClock() {
-  const time = `${String(trialClock.hour).padStart(2, "0")}:00`;
+  const time =
+    `${String(trialClock.hour).padStart(2, "0")}:` +
+    `${String(trialClock.minute).padStart(2, "0")}`;
   return TRIAL_CLOCK_CONFIG.showDay
     ? `${trialClock.day}日目 ${time}`
     : time;
@@ -208,6 +212,7 @@ function startTrialClock() {
   trialClock.active = TRIAL_CLOCK_CONFIG.enabled;
   trialClock.day = 1;
   trialClock.hour = TRIAL_CLOCK_CONFIG.startHour;
+  trialClock.minute = TRIAL_CLOCK_CONFIG.startMinute;
   renderTrialClock();
 }
 
@@ -219,7 +224,11 @@ function stopTrialClock() {
 function advanceTrialClock() {
   if (!TRIAL_CLOCK_CONFIG.enabled || !trialClock.active) return true;
 
-  trialClock.hour += TRIAL_CLOCK_CONFIG.hoursPerAction;
+  trialClock.minute += TRIAL_CLOCK_CONFIG.minutesPerAction;
+  while (trialClock.minute >= 60) {
+    trialClock.minute -= 60;
+    trialClock.hour++;
+  }
   while (trialClock.hour >= 24) {
     trialClock.hour -= 24;
     trialClock.day++;
@@ -609,7 +618,8 @@ function restoreDebugStateSnapshot(state) {
   Object.assign(trialClock, state.trialClock || {
     active: false,
     day: 1,
-    hour: TRIAL_CLOCK_CONFIG.startHour
+    hour: TRIAL_CLOCK_CONFIG.startHour,
+    minute: TRIAL_CLOCK_CONFIG.startMinute
   });
   renderTrialClock();
   playerName = state.playerName || "〇〇";
