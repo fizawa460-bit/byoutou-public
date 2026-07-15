@@ -2,6 +2,7 @@
 // 本文をここへ複製せず、必ずTEXTを参照する。
 (function setupSoftRoomDialogueViewer() {
   if (typeof DEBUG === "undefined" || !DEBUG) return;
+  if (showDebugMenu.__hasDialogueViewer) return;
 
   const scene = (id, label, getText) => ({ id, label, getText });
   const fixed = (id, label, value) => scene(id, label, () => value);
@@ -13,7 +14,10 @@
       id: "loop-start",
       label: "目覚め・ループ導入",
       scenes: [
-        fixed("SOFT_ROOM.START", "白い病室で目覚める", soft.START),
+        fixed("SOFT_ROOM.START.FULL", "白い病室で目覚める・0回", soft.START.FULL),
+        fixed("SOFT_ROOM.START.COMPRESSED", "冒頭説明・3回", soft.START.COMPRESSED),
+        fixed("SOFT_ROOM.START.ESSENTIAL", "冒頭説明・6回", soft.START.ESSENTIAL),
+        fixed("SOFT_ROOM.START.MINIMAL", "冒頭説明・9回", soft.START.MINIMAL),
         fixed("SOFT_ROOM.RETURN", "白い病室へ戻る", soft.RETURN),
         fixed("DEATH.LOOP_QUESTION", "ループへの気づき", death.LOOP_QUESTION),
         fixed("DEATH.TOILET", "トイレで死亡", death.TOILET),
@@ -68,6 +72,7 @@
         scene("SOFT_ROOM.PATROL_APPROACH", "看護師Aの巡回", () => soft.PATROL_APPROACH("看護師A")),
         scene("SOFT_ROOM.PATROL_SURVIVE", "巡回をやり過ごす", () => soft.PATROL_SURVIVE("看護師A")),
         fixed("SOFT_ROOM.NURSE_Z_MEET", "巡回中にZと会う", soft.NURSE_Z_MEET),
+        fixed("SOFT_ROOM.MORNING_WARNING", "朝の警告", soft.MORNING_WARNING),
         fixed("DEATH.MORNING_STILL", "朝まで動かない", death.MORNING_STILL),
         fixed("DEATH.MORNING_CLEANING", "朝まで掃除する", death.MORNING_CLEANING),
         scene("DEATH.DOOR_WATCHERS", "ドアを見る・初回", () => death.DOOR_WATCHERS(0)),
@@ -78,9 +83,12 @@
       id: "escape-door",
       label: "Z・脱出・ドア解除",
       scenes: [
-        fixed("SOFT_ROOM.NURSE_Z_DOOR_TALK", "Zとのドア越し会話", soft.NURSE_Z_DOOR_TALK),
+        scene("SOFT_ROOM.NURSE_Z_DOOR_TALK", "Zとのドア越し会話・1回目", () => soft.NURSE_Z_DOOR_TALK(1)),
+        scene("SOFT_ROOM.NURSE_Z_DOOR_TALK", "Zとのドア越し会話・2回目", () => soft.NURSE_Z_DOOR_TALK(2)),
+        scene("SOFT_ROOM.NURSE_Z_DOOR_TALK", "Zとのドア越し会話・3回目", () => soft.NURSE_Z_DOOR_TALK(3)),
         fixed("SOFT_ROOM.ESCAPE_PROPOSAL", "脱出の提案", soft.ESCAPE_PROPOSAL),
         fixed("SOFT_ROOM.DOOR_UNLOCK_START", "ドア解除開始", soft.DOOR_UNLOCK_START),
+        fixed("SOFT_ROOM.DOOR_UNLOCK_RETRY", "もう一度触れる", soft.DOOR_UNLOCK_RETRY),
         scene("SOFT_ROOM.DOOR_UNLOCK_STATUS", "解除状況", () => soft.DOOR_UNLOCK_STATUS({ time: "20:00", progress: 33, gauge: "■■■□□□□□□□", patternChanged: false })),
         fixed("SOFT_ROOM.DOOR_UNLOCK_PROGRESS", "正しい操作", soft.DOOR_UNLOCK_PROGRESS),
         fixed("SOFT_ROOM.DOOR_UNLOCK_WRONG_ACTION", "誤った操作", soft.DOOR_UNLOCK_WRONG_ACTION),
@@ -110,6 +118,7 @@
         fixed("SOFT_ROOM.CAR_ROAD2", "道路2", soft.CAR_ROAD2),
         fixed("SOFT_ROOM.CROSSWALK", "横断歩道", soft.CROSSWALK),
         fixed("SOFT_ROOM.CROSSWALK_PASSED", "横断歩道を待つ", soft.CROSSWALK_PASSED),
+        fixed("SOFT_ROOM.BEFORE_SIGNAL", "信号機へ向かう", soft.BEFORE_SIGNAL),
         fixed("SOFT_ROOM.GREEN_LIGHT", "青信号", soft.GREEN_LIGHT),
         fixed("SOFT_ROOM.RED_LIGHT", "赤信号", soft.RED_LIGHT),
         fixed("SOFT_ROOM.CAR_TALK1", "車内会話1", soft.CAR_TALK1),
@@ -151,7 +160,6 @@
   }
 
   function showSoftRoomDialogueMenu() {
-    debugHistory = [];
     document.body.className = "debug-dialogue-viewer";
     hideRulePopup();
     contentWarning.hidden = true;
@@ -177,4 +185,5 @@
     const returnButton = choices.lastElementChild;
     choices.insertBefore(button, returnButton);
   };
+  showDebugMenu.__hasDialogueViewer = true;
 })();

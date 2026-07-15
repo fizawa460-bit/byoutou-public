@@ -5,6 +5,15 @@ const SAVE_KEYS = {
   main: "byoutou.save.main",
   debug: "byoutou.save.debug"
 };
+
+// 試験導入中の時間経過。enabledをfalseにすれば機能全体を停止できる。
+// showDayをfalseにすると、通常画面には時刻だけを表示する。
+const TRIAL_CLOCK_CONFIG = {
+  enabled: true,
+  showDay: true,
+  startHour: 9,
+  hoursPerAction: 1
+};
 const ACHIEVEMENTS = [
   {
     id: "discharge",
@@ -88,6 +97,17 @@ const counters = {
   mealDeaths: 0
 };
 
+// 同じ死因で何度死亡したかを保存する。
+// ルール帳とは独立し、危機察知の段階判定だけに使う。
+const deathCauseCounts = {};
+
+// 試験時間はループ中だけ保持し、正式セーブには含めない。
+const trialClock = {
+  active: false,
+  day: 1,
+  hour: TRIAL_CLOCK_CONFIG.startHour
+};
+
 // セリフ本文は texts.js に分離。
 
 
@@ -162,10 +182,56 @@ const choices = document.getElementById("choices");
 const rulePopup = document.getElementById("rule-popup");
 const contentWarning = document.getElementById("content-warning");
 const saveInspector = document.getElementById("save-inspector");
+const trialClockDisplay = document.getElementById("trial-clock");
 
 // ============================================================
 // 2. 画面表示と共通UI
 // ============================================================
+
+function formatTrialClock() {
+  const time = `${String(trialClock.hour).padStart(2, "0")}:00`;
+  return TRIAL_CLOCK_CONFIG.showDay
+    ? `${trialClock.day}日目 ${time}`
+    : time;
+}
+
+function renderTrialClock() {
+  if (!trialClockDisplay) return;
+  const visible = TRIAL_CLOCK_CONFIG.enabled && trialClock.active;
+  trialClockDisplay.hidden = !visible;
+  if (visible) {
+    trialClockDisplay.textContent = formatTrialClock();
+  }
+}
+
+function startTrialClock() {
+  trialClock.active = TRIAL_CLOCK_CONFIG.enabled;
+  trialClock.day = 1;
+  trialClock.hour = TRIAL_CLOCK_CONFIG.startHour;
+  renderTrialClock();
+}
+
+function stopTrialClock() {
+  trialClock.active = false;
+  renderTrialClock();
+}
+
+function advanceTrialClock() {
+  if (!TRIAL_CLOCK_CONFIG.enabled || !trialClock.active) return true;
+
+  trialClock.hour += TRIAL_CLOCK_CONFIG.hoursPerAction;
+  while (trialClock.hour >= 24) {
+    trialClock.hour -= 24;
+    trialClock.day++;
+  }
+  renderTrialClock();
+
+  if (trialClock.day >= 2) {
+    showTrialMorningDeath();
+    return false;
+  }
+  return true;
+}
 
 function createSaveData() {
   return {
@@ -183,6 +249,7 @@ function createSaveData() {
       nurseZDoorTalks: counters.nurseZDoorTalks,
       mealDeaths: counters.mealDeaths
     },
+    deathCauseCounts: { ...deathCauseCounts },
     achievements: [...unlockedAchievementIds],
     seenTextIds: [...seenTextIds],
     playerName
@@ -203,6 +270,7 @@ function getDefaultSaveData() {
       nurseZDoorTalks: 0,
       mealDeaths: 0
     },
+    deathCauseCounts: {},
     achievements: [],
     seenTextIds: [],
     playerName: "〇〇"
@@ -214,6 +282,20 @@ function normalizeSaveData(data) {
   const defaults = getDefaultSaveData();
   const nonNegativeInteger = value =>
     Number.isInteger(value) && value >= 0 ? value : 0;
+  const normalizedDeathCauseCounts =
+    data.deathCauseCounts && typeof data.deathCauseCounts === "object"
+      ? Object.fromEntries(
+          Object.entries(data.deathCauseCounts)
+            .filter(([id, count]) =>
+              typeof id === "string" &&
+              /^[A-Z0-9_:-]+$/.test(id) &&
+              Number.isInteger(count) &&
+              count >= 0
+            )
+            .slice(0, 100)
+            .map(([id, count]) => [id, Math.min(count, 9999)])
+        )
+      : {};
 
   return {
     version: SAVE_VERSION,
@@ -230,6 +312,7 @@ function normalizeSaveData(data) {
       nurseZDoorTalks: nonNegativeInteger(data.counters?.nurseZDoorTalks),
       mealDeaths: nonNegativeInteger(data.counters?.mealDeaths)
     },
+    deathCauseCounts: normalizedDeathCauseCounts,
     achievements: Array.isArray(data.achievements)
       ? data.achievements.filter(id =>
           ACHIEVEMENTS.some(item => item.id === id && !item.placeholder)
@@ -258,6 +341,8 @@ function applySaveData(data) {
   counters.waterDeaths = normalized.counters.waterDeaths;
   counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
   counters.mealDeaths = normalized.counters.mealDeaths;
+  Object.keys(deathCauseCounts).forEach(id => delete deathCauseCounts[id]);
+  Object.assign(deathCauseCounts, normalized.deathCauseCounts);
   unlockedAchievementIds.clear();
   normalized.achievements.forEach(id => unlockedAchievementIds.add(id));
   seenTextIds.clear();
@@ -330,6 +415,7 @@ function formatSaveSlot(slot, label) {
     `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
     `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol}`,
     `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
+    `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
     `  achievements=${data.achievements.join(",") || "(none)"}`,
     `  seenTextIds=${data.seenTextIds.join(",") || "(none)"}`
   ].join("\n");
@@ -491,6 +577,9 @@ function runChoiceAction(item, button) {
   if (DEBUG && !item.noHistory) {
     saveDebugHistory();
   }
+  if (item.advancesTime !== false && !advanceTrialClock()) {
+    return;
+  }
   item.action(button);
 }
 
@@ -499,6 +588,8 @@ function getDebugStateSnapshot() {
     storyProgress: story.progress,
     flags: { ...flags },
     counters: { ...counters },
+    deathCauseCounts: { ...deathCauseCounts },
+    trialClock: { ...trialClock },
     playerName,
     currentSceneId,
     pendingDoorNurse,
@@ -513,6 +604,14 @@ function restoreDebugStateSnapshot(state) {
   story.progress = state.storyProgress;
   Object.assign(flags, state.flags);
   Object.assign(counters, state.counters);
+  Object.keys(deathCauseCounts).forEach(id => delete deathCauseCounts[id]);
+  Object.assign(deathCauseCounts, state.deathCauseCounts || {});
+  Object.assign(trialClock, state.trialClock || {
+    active: false,
+    day: 1,
+    hour: TRIAL_CLOCK_CONFIG.startHour
+  });
+  renderTrialClock();
   playerName = state.playerName || "〇〇";
   currentSceneId = state.currentSceneId || null;
   pendingDoorNurse = state.pendingDoorNurse;
@@ -557,24 +656,28 @@ function restoreDebugHistory() {
 // ラベルは後で場面ごとに差し替えやすいようにしている。
 function waitForContinue(nextAction, label = "次に進む") {
   setChoices([
-    { label, action: nextAction }
+    { label, action: nextAction, advancesTime: false }
   ]);
 }
 
 function waitForInitialContinue(nextAction, label = "次に進む") {
-  setInitialChoices([
-    { label, action: nextAction }
+  setChoices([
+    { label, action: nextAction, advancesTime: false }
   ]);
 }
 
 function setInitialChoices(items) {
-  const initialChoices = [...items];
+  const initialChoices = items.map(item => ({
+    ...item,
+    advancesTime: item.advancesTime !== false
+  }));
 
   if (DEBUG) {
     initialChoices.push({
       label: "タイトルへ戻る",
       action: startTitle,
-      noHistory: true
+      noHistory: true,
+      advancesTime: false
     });
   }
 
@@ -596,6 +699,7 @@ function startTitle({ persist = true } = {}) {
     }
   }
 
+  stopTrialClock();
   document.body.className = "";
   if (saveInspector) saveInspector.hidden = true;
   title.textContent = getTitleText();
@@ -605,11 +709,11 @@ function startTitle({ persist = true } = {}) {
   counters.hiddenLoopClicks = 0;
   flags.loopButtonLocked = false;
   const titleChoices = [
-    { label: "はじめる", action: startGame },
-    { label: "ルール", action: showRules }
+    { label: "はじめる", action: startGame, advancesTime: false },
+    { label: "ルール", action: showRules, advancesTime: false }
   ];
   if (DEBUG) {
-    titleChoices.push({ label: "デバッグ", action: openDebugMenu });
+    titleChoices.push({ label: "デバッグ", action: openDebugMenu, advancesTime: false });
   }
   setChoices(titleChoices);
   renderAchievementShelf();
@@ -818,6 +922,7 @@ function showNameRegistered() {
 }
 
 function showInitialDayIntro() {
+  startTrialClock();
   document.body.className = "";
   hideRulePopup();
   title.textContent = "";
@@ -954,6 +1059,13 @@ function goScene(sceneId, params = {}) {
   }
 }
 
+function getSoftRoomStartText() {
+  if (counters.deaths >= 9) return TEXT.SOFT_ROOM.START.MINIMAL;
+  if (counters.deaths >= 6) return TEXT.SOFT_ROOM.START.ESSENTIAL;
+  if (counters.deaths >= 3) return TEXT.SOFT_ROOM.START.COMPRESSED;
+  return TEXT.SOFT_ROOM.START.FULL;
+}
+
 const SCENES = {
   "soft.start": () => {
     document.body.className = "";
@@ -962,7 +1074,7 @@ const SCENES = {
     counters.hiddenLoopClicks = 0;
     flags.loopButtonLocked = false;
     advanceStoryProgress(STORY.SOFT_ROOM.START);
-    typeText(TEXT.SOFT_ROOM.START, () => goScene("soft.choices"));
+    typeText(getSoftRoomStartText(), () => goScene("soft.choices"));
   },
   "soft.choices": () => {
     const baseChoices = [
@@ -1033,7 +1145,7 @@ const SCENES = {
     flags.paperCupPlacedThisLoop = true;
     flags.paperCupProviderIdThisLoop = nurseId;
     typeText(
-      `${nurseName}「紙コップ置いてませんでしたね。」\n\n水を入れる用のドアから、日付の書かれた紙コップが二つ入れられた。`,
+      TEXT.SOFT_ROOM.PAPER_CUP_PLACED(nurseName),
       () => {
         setChoices([
           { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
@@ -1408,6 +1520,7 @@ function showRules() {
 // 白い病室から始まる本編の入口。
 // story.progressの進行度によって、今後ここで文章や選択肢を変えていく。
 function startLoop() {
+  startTrialClock();
   goScene("soft.start");
 }
 
@@ -1504,12 +1617,8 @@ function talkToNurseZAtDoor() {
     advanceStoryProgress(STORY.SOFT_ROOM.ESCAPE_READY);
     findRule("nurseZCanHelp");
   }
-  const line =
-    counters.nurseZDoorTalks >= 3 ? "今夜ドアの前で待っていてください。" :
-    counters.nurseZDoorTalks === 2 ? "もう少し待ってください。" :
-    "今はまだ、開けられません。";
   typeText(
-    `看護師Zは、ドアの向こうで少しだけ声を落とした。\n\n看護師Z「${line}」\n\nそれだけ言って、足音は遠ざかった。\n\n生きている。`,
+    TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(counters.nurseZDoorTalks),
     () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z", nurseId: "z" }))
   );
 }
@@ -1546,8 +1655,14 @@ function showWaterChoices(providedByNurseZ = false) {
 function drinkWater(providedByNurseZ = false) {
   if (!providedByNurseZ) {
     findRule("doNotDrinkWater");
-    counters.waterDeaths++;
-    die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.DRINK_DEATH });
+    die(
+      {
+        type: "GENERIC",
+        causeId: "WATER_DRINK",
+        reason: TEXT.SOFT_ROOM.WATER.DRINK_DEATH
+      },
+      { beforeDeath: () => { counters.waterDeaths++; } }
+    );
     return;
   }
 
@@ -1579,7 +1694,14 @@ function scatterWater() {
     TEXT.SOFT_ROOM.WATER.SCATTER,
     () => {
       setChoices([
-        { label: TEXT.CHOICE.FOLLOW_LINE, action: () => die({ type: "GENERIC", reason: TEXT.SOFT_ROOM.WATER.INVISIBLE_LINE_DEATH }) },
+        {
+          label: TEXT.CHOICE.FOLLOW_LINE,
+          action: () => die({
+            type: "GENERIC",
+            causeId: "WATER_INVISIBLE_LINE",
+            reason: TEXT.SOFT_ROOM.WATER.INVISIBLE_LINE_DEATH
+          })
+        },
         { label: TEXT.CHOICE.IGNORE_LINE, action: () => goScene("soft.meal") }
       ]);
     }
@@ -1594,13 +1716,16 @@ function showMealEvent() {
 
 function eatMeal() {
   const alreadyDiedFromMeal = counters.mealDeaths > 0;
-  counters.mealDeaths++;
-  die({
-    type: "GENERIC",
-    reason: alreadyDiedFromMeal
-      ? TEXT.SOFT_ROOM.MEAL.AFTER_DEATH_DEATH
-      : TEXT.SOFT_ROOM.MEAL.FIRST_DEATH
-  });
+  die(
+    {
+      type: "GENERIC",
+      causeId: "MEAL_EAT",
+      reason: alreadyDiedFromMeal
+        ? TEXT.SOFT_ROOM.MEAL.AFTER_DEATH_DEATH
+        : TEXT.SOFT_ROOM.MEAL.FIRST_DEATH
+    },
+    { beforeDeath: () => { counters.mealDeaths++; } }
+  );
 }
 
 function showMealChoices() {
@@ -2011,6 +2136,16 @@ function completeWhiteRoom() {
   startTitle();
 }
 
+function showTrialMorningDeath() {
+  stopTrialClock();
+  typeText(
+    TEXT.TRIAL_CLOCK.MORNING_DEATH,
+    () => performDeath("TRIAL_MORNING", {
+      causeId: "TRIAL_MORNING"
+    })
+  );
+}
+
 function showMorningWarning() {
   findRule("morningDanger");
   typeText(
@@ -2066,6 +2201,36 @@ function resolveDeathMessage(reason) {
   }
 }
 
+function getDeathCauseId(reason) {
+  if (typeof reason === "string") return reason;
+  if (!reason || typeof reason !== "object") {
+    throw new Error("Death reason must be a TEXT.DEATH key or typed object.");
+  }
+
+  if (reason.type === "FOOTWORK_FAIL") {
+    if (reason.expected === "5") return "FOOTWORK_JUMP_FAIL";
+    if (reason.expected === "6") return "FOOTWORK_PAY_FAIL";
+    if (reason.expected === "7") return "FOOTWORK_DONATE_FAIL";
+    return "FOOTWORK_TOUCH";
+  }
+
+  if (reason.type === "GENERIC") {
+    if (typeof reason.causeId !== "string" || !reason.causeId) {
+      throw new Error("GENERIC death reason requires causeId.");
+    }
+    return reason.causeId;
+  }
+
+  return reason.type;
+}
+
+function getDangerSenseStage(causeId) {
+  const previousDeaths = deathCauseCounts[causeId] || 0;
+  if (previousDeaths >= 2) return "refuse";
+  if (previousDeaths >= 1) return "warn";
+  return "none";
+}
+
 // 隠し選択肢の処理。
 // 何度か押すと表示が変わり、しばらく待つと死亡ルートとして押せるようになる。
 function handleHiddenLoopButton(button) {
@@ -2089,7 +2254,30 @@ function handleHiddenLoopButton(button) {
 
 // 死亡イベント。
 // reasonには TEXT.DEATH のキー、またはパラメータ付きオブジェクトを渡す。
-function die(reason) {
+function captureDangerSenseScreen() {
+  return {
+    bodyClassName: document.body.className,
+    titleText: title.textContent,
+    textContent: text.textContent,
+    choiceItems: [...currentChoiceItems]
+  };
+}
+
+function restoreDangerSenseScreen(snapshot) {
+  clearInterval(typingTimer);
+  typingTimer = null;
+  clearTextSkip();
+  document.body.className = snapshot.bodyClassName;
+  title.textContent = snapshot.titleText;
+  text.textContent = snapshot.textContent;
+  setChoices(snapshot.choiceItems);
+}
+
+function performDeath(reason, { causeId, beforeDeath = null, showWarning = false } = {}) {
+  stopTrialClock();
+  if (typeof beforeDeath === "function") beforeDeath();
+  deathCauseCounts[causeId] = (deathCauseCounts[causeId] || 0) + 1;
+
   document.body.className = "dead";
   hideRulePopup();
   title.textContent = "";
@@ -2103,15 +2291,51 @@ function die(reason) {
   if (counters.deaths >= 1 || reason === "LOOP_QUESTION") {
     findRule("loopChanges");
   }
+
   const resolved = resolveDeathMessage(reason);
-  const message =
+  const deathMessage =
     reason === "LOOP_QUESTION"
       ? resolved
       : `${resolved}\n\n死亡。`;
+  const message = showWarning
+    ? `${TEXT.UI.DANGER_SENSE_WARNING}\n\n${deathMessage}`
+    : deathMessage;
+
   typeText(message, () => {
     setChoices([
       { label: "タイトルへ戻る", action: nextLoop }
     ]);
+  });
+}
+
+function die(reason, { beforeDeath = null } = {}) {
+  const causeId = getDeathCauseId(reason);
+  const dangerSenseStage = getDangerSenseStage(causeId);
+
+  if (dangerSenseStage === "refuse") {
+    const snapshot = captureDangerSenseScreen();
+    typeText(TEXT.UI.DANGER_SENSE_REFUSAL, () => {
+      setChoices([
+        {
+          label: TEXT.CHOICE.DO_IT_ANYWAY,
+          action: () => performDeath(reason, { causeId, beforeDeath }),
+          advancesTime: false
+        },
+        {
+          label: TEXT.CHOICE.QUIT,
+          action: () => restoreDangerSenseScreen(snapshot),
+          noHistory: true,
+          advancesTime: false
+        }
+      ]);
+    });
+    return;
+  }
+
+  performDeath(reason, {
+    causeId,
+    beforeDeath,
+    showWarning: dangerSenseStage === "warn"
   });
 }
 

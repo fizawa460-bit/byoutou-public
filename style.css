@@ -32,6 +32,16 @@ body {
   touch-action: manipulation;
 }
 
+body.debug-dialogue-viewer #title {
+  margin-top: 4vh;
+  font-size: 26px;
+}
+
+body.debug-dialogue-viewer #text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 #choices {
   margin-top: 32px;
   display: flex;
@@ -197,4 +207,24 @@ button:disabled:active {
   background: #111;
   color: #eee;
   border-color: #333;
+}
+
+#trial-clock {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 20;
+  padding: 4px 7px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.08);
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+#trial-clock[hidden] {
+  display: none;
 }
