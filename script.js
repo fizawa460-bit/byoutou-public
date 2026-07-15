@@ -127,8 +127,7 @@ const doorUnlock = {
   progress: 0,
   patrolHandled: false,
   enemyLearned: false,
-  patternChanged: false,
-  hour: 20
+  patternChanged: false
 };
 
 // 足運びイベント用。
@@ -235,7 +234,10 @@ function advanceTrialClock() {
   }
   renderTrialClock();
 
-  if (trialClock.day >= 2) {
+  const reachedSecondMorning =
+    trialClock.day > 2 ||
+    (trialClock.day === 2 && trialClock.hour >= 6);
+  if (reachedSecondMorning) {
     showTrialMorningDeath();
     return false;
   }
@@ -1268,6 +1270,11 @@ const SCENES = {
       goScene("soft.escapeProposal");
       return;
     }
+    recordNurseZDoorTalk();
+    if (counters.nurseZDoorTalks >= 3) {
+      goScene("soft.escapeProposal");
+      return;
+    }
     typeText(
       TEXT.SOFT_ROOM.NURSE_Z_MEET,
       () => {
@@ -1295,7 +1302,6 @@ const SCENES = {
     doorUnlock.progress = 0;
     doorUnlock.patrolHandled = false;
     doorUnlock.patternChanged = doorUnlock.enemyLearned;
-    doorUnlock.hour = 20;
     typeText(
       TEXT.SOFT_ROOM.DOOR_UNLOCK_START,
       () => waitForContinue(() => goScene("door.status"))
@@ -1303,7 +1309,7 @@ const SCENES = {
   },
   "door.status": ({ extraText = "" } = {}) => {
     const message = TEXT.SOFT_ROOM.DOOR_UNLOCK_STATUS({
-      time: getDoorUnlockTimeText(),
+      time: formatTrialClock(),
       progress: doorUnlock.progress,
       gauge: getDoorUnlockGauge(),
       patternChanged: doorUnlock.patternChanged,
@@ -1328,21 +1334,11 @@ const SCENES = {
     const expected = route[doorUnlock.step];
     if (action !== expected) {
       rewindDoorUnlockStep(1);
-      advanceDoorUnlockTime();
-      if (isDoorUnlockMorning()) {
-        goScene("door.morning");
-        return;
-      }
       goScene("door.status", { extraText: TEXT.SOFT_ROOM.DOOR_UNLOCK_WRONG_ACTION });
       return;
     }
     doorUnlock.step++;
-    advanceDoorUnlockTime();
     syncDoorUnlockProgress();
-    if (isDoorUnlockMorning()) {
-      goScene("door.morning");
-      return;
-    }
     if (doorUnlock.step >= route.length) {
       goScene("door.complete");
       return;
@@ -1382,16 +1378,11 @@ const SCENES = {
     doorUnlock.patternChanged = true;
     rewindDoorUnlockStep(2);
     findRule("enemyLearns");
-    advanceDoorUnlockTime();
     typeText(
       prefixText + "\n\n" + TEXT.SOFT_ROOM.DOOR_UNLOCK_AVOID,
-      () => {
-        if (isDoorUnlockMorning()) {
-          waitForContinue(() => goScene("door.morning"));
-          return;
-        }
-        waitForContinue(() => goScene("door.status", { extraText: TEXT.SOFT_ROOM.DOOR_UNLOCK_RETRY }));
-      }
+      () => waitForContinue(() => goScene("door.status", {
+        extraText: TEXT.SOFT_ROOM.DOOR_UNLOCK_RETRY
+      }))
     );
   },
   "door.fail": ({ reason }) => {
@@ -1620,13 +1611,17 @@ function talkThroughDoor(nurse) {
   die("TALK_THROUGH_DOOR");
 }
 
-function talkToNurseZAtDoor() {
+function recordNurseZDoorTalk() {
   counters.nurseZDoorTalks++;
-  pendingDoorNurse = null;
   if (counters.nurseZDoorTalks >= 3) {
     advanceStoryProgress(STORY.SOFT_ROOM.ESCAPE_READY);
     findRule("nurseZCanHelp");
   }
+}
+
+function talkToNurseZAtDoor() {
+  recordNurseZDoorTalk();
+  pendingDoorNurse = null;
   typeText(
     TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(counters.nurseZDoorTalks),
     () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z", nurseId: "z" }))
@@ -1914,22 +1909,6 @@ function syncDoorUnlockProgress() {
 function rewindDoorUnlockStep(amount = 1) {
   doorUnlock.step = Math.max(0, doorUnlock.step - amount);
   syncDoorUnlockProgress();
-}
-
-function getDoorUnlockTimeText() {
-  return `${String(doorUnlock.hour).padStart(2, "0")}:00\n`;
-}
-
-function advanceDoorUnlockTime() {
-  doorUnlock.hour = (doorUnlock.hour + 1) % 24;
-}
-
-function isDoorUnlockMorning() {
-  return doorUnlock.hour === 6;
-}
-
-function endDoorUnlockByMorning() {
-  goScene("door.morning");
 }
 
 function handleDoorUnlockAction(action) {
