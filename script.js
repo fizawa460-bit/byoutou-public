@@ -1,4 +1,4 @@
-const APP_VERSION = "ver0.23";
+const APP_VERSION = "ver0.24";
 const DEBUG = true;
 const SAVE_VERSION = 1;
 const SAVE_KEYS = {
@@ -165,7 +165,8 @@ const FOOTWORK_RHYTHM_CONFIG = {
 };
 const footworkRhythm = {
   cueActive: false,
-  expected: null
+  expected: null,
+  token: 0
 };
 // タイマーIDはセーブ/デバッグ対象にできないため、状態オブジェクトの外に置く。
 let footworkCueStartTimer = null;
@@ -302,6 +303,7 @@ function createSaveData() {
       mealDeaths: counters.mealDeaths
     },
     deathCauseCounts: { ...deathCauseCounts },
+    rules: rules.filter(rule => rule.found).map(rule => rule.id),
     achievements: [...unlockedAchievementIds],
     seenTextIds: [...seenTextIds],
     playerName
@@ -329,6 +331,7 @@ function getDefaultSaveData() {
       mealDeaths: 0
     },
     deathCauseCounts: {},
+    rules: [],
     achievements: [],
     seenTextIds: [],
     playerName: "〇〇"
@@ -377,6 +380,11 @@ function normalizeSaveData(data) {
       mealDeaths: nonNegativeInteger(data.counters?.mealDeaths)
     },
     deathCauseCounts: normalizedDeathCauseCounts,
+    rules: Array.isArray(data.rules)
+      ? [...new Set(data.rules.filter(id =>
+          typeof id === "string" && rules.some(rule => rule.id === id)
+        ))]
+      : [],
     achievements: Array.isArray(data.achievements)
       ? data.achievements.filter(id =>
           ACHIEVEMENTS.some(item => item.id === id && !item.placeholder)
@@ -413,6 +421,10 @@ function applySaveData(data) {
   counters.mealDeaths = normalized.counters.mealDeaths;
   Object.keys(deathCauseCounts).forEach(id => delete deathCauseCounts[id]);
   Object.assign(deathCauseCounts, normalized.deathCauseCounts);
+  const foundRuleIds = new Set(normalized.rules);
+  rules.forEach(rule => {
+    rule.found = foundRuleIds.has(rule.id);
+  });
   unlockedAchievementIds.clear();
   normalized.achievements.forEach(id => unlockedAchievementIds.add(id));
   seenTextIds.clear();
@@ -486,6 +498,7 @@ function formatSaveSlot(slot, label) {
     `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint} footworkUnlocks=${Number(data.flags.footworkJumpUnlocked)}${Number(data.flags.footworkPaymentUnlocked)}${Number(data.flags.footworkDonationUnlocked)}`,
     `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
     `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
+    `  rules=${data.rules.join(",") || "(none)"}`,
     `  achievements=${data.achievements.join(",") || "(none)"}`,
     `  seenTextIds=${data.seenTextIds.join(",") || "(none)"}`
   ].join("\n");
@@ -1679,15 +1692,15 @@ function recordNurseZDoorTalk() {
 function talkToNurseZAtDoor() {
   recordNurseZDoorTalk();
   const unlockedSpecial =
-    counters.nurseZDoorTalks >= SOFT_ROOM_CONFIG.nurseZTalksToEscape
+    counters.nurseZDoorTalks > SOFT_ROOM_CONFIG.nurseZTalksToEscape
       ? unlockNextFootworkSpecialFromNurseZ()
       : null;
-  const unlockHint = unlockedSpecial
-    ? "\n\n" + TEXT.SOFT_ROOM.NURSE_Z_FOOTWORK_UNLOCK(unlockedSpecial)
-    : "";
   pendingDoorNurse = null;
   typeText(
-    TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(counters.nurseZDoorTalks) + unlockHint,
+    TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(
+      counters.nurseZDoorTalks,
+      unlockedSpecial
+    ),
     () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z", nurseId: "z" }))
   );
 }
@@ -2064,17 +2077,17 @@ function getFootworkCuePosition(expected) {
   return positions[expected] || "center";
 }
 
+function resetFootworkCueElement(element, className) {
+  if (!element) return;
+  element.hidden = true;
+  element.className = className;
+  element.textContent = "";
+  element.style.removeProperty("--footwork-cue-top");
+}
+
 function hideFootworkCue() {
-  if (footworkCue) {
-    footworkCue.hidden = true;
-    footworkCue.className = "footwork-cue";
-    footworkCue.textContent = "";
-  }
-  if (footworkDecoy) {
-    footworkDecoy.hidden = true;
-    footworkDecoy.className = "footwork-decoy";
-    footworkDecoy.textContent = "";
-  }
+  resetFootworkCueElement(footworkCue, "footwork-cue");
+  resetFootworkCueElement(footworkDecoy, "footwork-decoy");
 }
 
 function clearFootworkRhythm() {
@@ -2084,6 +2097,7 @@ function clearFootworkRhythm() {
   footworkCueEndTimer = null;
   footworkRhythm.cueActive = false;
   footworkRhythm.expected = null;
+  footworkRhythm.token++;
   hideFootworkCue();
 }
 
@@ -2099,6 +2113,21 @@ function getFootworkDecoyPosition(expected) {
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+function positionFootworkCue(element, position) {
+  if (!element) return;
+  element.className = `${element === footworkCue ? "footwork-cue" : "footwork-decoy"} cue-${position}`;
+
+  if (position === "left-back" || position === "right-back") {
+    const choicesTop = choices.getBoundingClientRect().top;
+    element.style.setProperty(
+      "--footwork-cue-top",
+      `${Math.max(72, choicesTop - 42)}px`
+    );
+  } else {
+    element.style.removeProperty("--footwork-cue-top");
+  }
+}
+
 function showFootworkDecoy(expected) {
   if (
     !footworkDecoy ||
@@ -2109,8 +2138,10 @@ function showFootworkDecoy(expected) {
   }
 
   const decoyTexts = TEXT.UI.FOOTWORK_DECOYS;
-  footworkDecoy.className =
-    `footwork-decoy cue-${getFootworkDecoyPosition(expected)}`;
+  positionFootworkCue(
+    footworkDecoy,
+    getFootworkDecoyPosition(expected)
+  );
   footworkDecoy.textContent =
     decoyTexts[Math.floor(Math.random() * decoyTexts.length)];
   footworkDecoy.hidden = false;
@@ -2118,7 +2149,7 @@ function showFootworkDecoy(expected) {
 
 function showFootworkCue(expected) {
   if (footworkCue) {
-    footworkCue.className = `footwork-cue cue-${getFootworkCuePosition(expected)}`;
+    positionFootworkCue(footworkCue, getFootworkCuePosition(expected));
     footworkCue.textContent =
       expected === "wait" ? TEXT.UI.FOOTWORK_STOP : TEXT.UI.FOOTWORK_NOW;
     footworkCue.hidden = false;
@@ -2129,16 +2160,19 @@ function showFootworkCue(expected) {
 function startFootworkRhythm(expected) {
   clearFootworkRhythm();
   footworkRhythm.expected = expected;
+  const rhythmToken = footworkRhythm.token;
 
   const leadTime =
     FOOTWORK_RHYTHM_CONFIG.intervalMs -
     FOOTWORK_RHYTHM_CONFIG.cueDurationMs;
 
   footworkCueStartTimer = setTimeout(() => {
+    if (rhythmToken !== footworkRhythm.token) return;
     footworkRhythm.cueActive = true;
     showFootworkCue(expected);
 
     footworkCueEndTimer = setTimeout(() => {
+      if (rhythmToken !== footworkRhythm.token) return;
       footworkRhythm.cueActive = false;
       hideFootworkCue();
       handleFootworkRhythmTimeout(expected);
@@ -2196,14 +2230,12 @@ function handleFootworkRhythmInput(input) {
     handleLockedFootworkSpecial(expected);
     return;
   }
-  if (
-    !footworkRhythm.cueActive ||
-    expected === "wait" ||
-    input !== expected
-  ) {
+  if (expected === "wait" || input !== expected) {
     rewindFootworkAndContinue();
     return;
   }
+
+  // 正解ルートを覚えていれば、合図を待たずに進める。
   advanceFootworkStep(expected);
 }
 

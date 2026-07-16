@@ -266,13 +266,13 @@ button:disabled:active {
 
 .footwork-cue.cue-left-back,
 .footwork-decoy.cue-left-back {
-  top: 78%;
+  top: var(--footwork-cue-top, 68%);
   left: 16%;
 }
 
 .footwork-cue.cue-right-back,
 .footwork-decoy.cue-right-back {
-  top: 78%;
+  top: var(--footwork-cue-top, 68%);
   left: 84%;
 }
 
