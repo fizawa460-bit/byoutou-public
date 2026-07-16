@@ -22,10 +22,15 @@ const TEXT = {
       `Zドア会話: ${nurseZDoorTalks}\n`
   },
   TRIAL_CLOCK: {
-    MORNING_DEATH: textBlock([
+    MORNING_CONTINUE: textBlock([
       "遠くで、朝の音がした。",
       "コケコッコー。",
-      "二日目になった。"
+      "ベッドへ移動した。",
+      "しばらくして、時計は9:00を示していた。"
+    ]),
+    SLEEP_TO_NEXT_DAY: textBlock([
+      "ベッドへ戻り、眠った。",
+      "目を覚ますと、時計は9:00を示していた。"
     ])
   },
   CHOICE: {
@@ -51,7 +56,7 @@ const TEXT = {
     RETURN_BED: "布団へ戻る",
     CLEAN_MORE: "さらに磨く",
     WAIT_PATROL: "巡回を待つ",
-    WAIT_DAWN: "夜明けを待つ",
+    WAIT_DAWN: "ベッドに向かう",
     UNLOCK_DOOR: "ドア解除を行う",
     QUIT: "やめる",
     DO_IT_ANYWAY: "それでもやる",
@@ -306,6 +311,10 @@ const TEXT = {
       `${nurse.name}の声がする。`,
       "「〇〇さん、どうしました？」"
     ]),
+    NURSE_C_SHORTCUT_HINT: textBlock([
+      "看護師C「今の君には、まだ関係ない独り言だが。」",
+      "看護師C「扉に手をかけた者には、入口の沈黙が近道を教えるらしいぞ。」"
+    ]),
     DOOR_KNOCK: (nurse) => textBlock([
       "放送が切れた。",
       "しばらくして、ドアが鳴った。",
@@ -509,7 +518,11 @@ const TEXT = {
       "ガチャ。",
       "最後の音だけ、やけにはっきり聞こえた。",
       "看護師Z「開きました。」",
-      "ドアが、少しだけ開いた。"
+      "ドアが、少しだけ開いた。",
+      "開いたドアの内側に、薄く文字が書かれている。",
+      "「ここから出ても、終わりじゃない。」",
+      "「次は、壁を見ろ。」",
+      "――〇〇"
     ]),
     DOOR_UNLOCK_MORNING: textBlock([
       "廊下の奥で、朝の気配がした。",
@@ -564,6 +577,7 @@ const TEXT = {
       "最後の足音が、白い床ではない場所へ落ちた。",
       "？？？「もういい。」",
       "？？？「乗れ。」",
+      "？？？「安心するな。出ただけだ。」",
       "気がつくと、車のドアが開いていた。"
     ]),
     CAR_START: textBlock([
@@ -641,7 +655,6 @@ const TEXT = {
     ])
   },
   DEATH: {
-    TRIAL_MORNING: "朝を迎えた。",
 
     TOILET: textBlock([
       "トイレへ向かった。",

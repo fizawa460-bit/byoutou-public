@@ -1,4 +1,4 @@
-const APP_VERSION = "ver1.22";
+const APP_VERSION = "ver1.23";
 const DEBUG = true;
 const SAVE_VERSION = 1;
 const SAVE_KEYS = {
@@ -80,7 +80,10 @@ const flags = {
   paperCupPlacedThisLoop: false,
   paperCupProviderIdThisLoop: null,
   metNurseZOnPatrol: false,
-  nameRegistered: false
+  nameRegistered: false,
+  reachedDoorUnlock: false,
+  reachedFootwork: false,
+  heardNurseCShortcutHint: false
 };
 
 let playerName = "〇〇";
@@ -107,7 +110,8 @@ const trialClock = {
   active: false,
   day: 1,
   hour: TRIAL_CLOCK_CONFIG.startHour,
-  minute: TRIAL_CLOCK_CONFIG.startMinute
+  minute: TRIAL_CLOCK_CONFIG.startMinute,
+  lastMorningHandledDay: 1
 };
 
 // セリフ本文は texts.js に分離。
@@ -166,7 +170,8 @@ const rules = [
   { id: "morningDanger", text: "朝の音がしたら、もう遅い。", found: false },
   { id: "someNursesDiffer", text: "すべての看護師が同じではない。", found: false },
   { id: "nurseZCanHelp", text: "看護師Zは、脱出に関係している。", found: false },
-  { id: "enemyLearns", text: "一度通じたやり方が、次も通じるとは限らない。", found: false }
+  { id: "enemyLearns", text: "一度通じたやり方が、次も通じるとは限らない。", found: false },
+  { id: "entranceShortcut", text: "一度たどり着いた場所へは、入口の沈黙が近道を示す。", found: false }
 ];
 
 const doorUnlockActions = [
@@ -212,6 +217,7 @@ function startTrialClock() {
   trialClock.day = 1;
   trialClock.hour = TRIAL_CLOCK_CONFIG.startHour;
   trialClock.minute = TRIAL_CLOCK_CONFIG.startMinute;
+  trialClock.lastMorningHandledDay = 1;
   renderTrialClock();
 }
 
@@ -234,11 +240,11 @@ function advanceTrialClock() {
   }
   renderTrialClock();
 
-  const reachedSecondMorning =
-    trialClock.day > 2 ||
-    (trialClock.day === 2 && trialClock.hour >= 6);
-  if (reachedSecondMorning) {
-    showTrialMorningDeath();
+  const reachedUnhandledMorning =
+    trialClock.day > trialClock.lastMorningHandledDay &&
+    trialClock.hour >= 6;
+  if (reachedUnhandledMorning) {
+    showNextDayMorning();
     return false;
   }
   return true;
@@ -252,7 +258,10 @@ function createSaveData() {
     },
     flags: {
       nameRegistered: flags.nameRegistered,
-      metNurseZOnPatrol: flags.metNurseZOnPatrol
+      metNurseZOnPatrol: flags.metNurseZOnPatrol,
+      reachedDoorUnlock: flags.reachedDoorUnlock,
+      reachedFootwork: flags.reachedFootwork,
+      heardNurseCShortcutHint: flags.heardNurseCShortcutHint
     },
     counters: {
       deaths: counters.deaths,
@@ -273,7 +282,10 @@ function getDefaultSaveData() {
     story: { progress: STORY.INITIAL_DAY },
     flags: {
       nameRegistered: false,
-      metNurseZOnPatrol: false
+      metNurseZOnPatrol: false,
+      reachedDoorUnlock: false,
+      reachedFootwork: false,
+      heardNurseCShortcutHint: false
     },
     counters: {
       deaths: 0,
@@ -315,7 +327,10 @@ function normalizeSaveData(data) {
     },
     flags: {
       nameRegistered: data.flags?.nameRegistered === true,
-      metNurseZOnPatrol: data.flags?.metNurseZOnPatrol === true
+      metNurseZOnPatrol: data.flags?.metNurseZOnPatrol === true,
+      reachedDoorUnlock: data.flags?.reachedDoorUnlock === true,
+      reachedFootwork: data.flags?.reachedFootwork === true,
+      heardNurseCShortcutHint: data.flags?.heardNurseCShortcutHint === true
     },
     counters: {
       deaths: nonNegativeInteger(data.counters?.deaths),
@@ -348,6 +363,9 @@ function applySaveData(data) {
   story.progress = normalized.story.progress;
   flags.nameRegistered = normalized.flags.nameRegistered;
   flags.metNurseZOnPatrol = normalized.flags.metNurseZOnPatrol;
+  flags.reachedDoorUnlock = normalized.flags.reachedDoorUnlock;
+  flags.reachedFootwork = normalized.flags.reachedFootwork;
+  flags.heardNurseCShortcutHint = normalized.flags.heardNurseCShortcutHint;
   counters.deaths = normalized.counters.deaths;
   counters.waterDeaths = normalized.counters.waterDeaths;
   counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
@@ -424,7 +442,7 @@ function formatSaveSlot(slot, label) {
   const data = result.data;
   return [
     `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
-    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol}`,
+    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint}`,
     `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
     `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
     `  achievements=${data.achievements.join(",") || "(none)"}`,
@@ -621,7 +639,8 @@ function restoreDebugStateSnapshot(state) {
     active: false,
     day: 1,
     hour: TRIAL_CLOCK_CONFIG.startHour,
-    minute: TRIAL_CLOCK_CONFIG.startMinute
+    minute: TRIAL_CLOCK_CONFIG.startMinute,
+    lastMorningHandledDay: 1
   });
   renderTrialClock();
   playerName = state.playerName || "〇〇";
@@ -934,7 +953,6 @@ function showNameRegistered() {
 }
 
 function showInitialDayIntro() {
-  startTrialClock();
   document.body.className = "";
   hideRulePopup();
   title.textContent = "";
@@ -1092,7 +1110,7 @@ const SCENES = {
     const baseChoices = [
       { label: TEXT.CHOICE.TOILET, action: () => die("TOILET") },
       { label: TEXT.CHOICE.NURSE_CALL, action: () => goScene("soft.nurseCall") },
-      { label: TEXT.CHOICE.SLEEP, action: () => die("SLEEP") }
+      { label: TEXT.CHOICE.SLEEP, action: advanceToNextDayBySleeping }
     ];
     if (counters.deaths >= 1) {
       baseChoices.push({
@@ -1181,6 +1199,7 @@ const SCENES = {
     typeText(TEXT.SOFT_ROOM.MEAL.NIGHT_PREVIEW, () => waitForContinue(() => goScene("soft.toothbrush")));
   },
   "soft.toothbrush": () => {
+    moveTrialClockToToothbrushTime();
     typeText(TEXT.SOFT_ROOM.TOOTHBRUSH_EVENT, showToothbrushChoices);
   },
   "soft.lightsOut": () => {
@@ -1236,7 +1255,7 @@ const SCENES = {
           { label: TEXT.CHOICE.CLEAN_MORE, action: () => goScene("soft.cleaningResult") },
           { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
           { label: TEXT.CHOICE.LOOK_DOOR, action: lookAtDoor },
-          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
+          { label: TEXT.CHOICE.WAIT_DAWN, action: () => die("DARK_ROOM_RETURN") }
         ]);
       }
     );
@@ -1256,7 +1275,7 @@ const SCENES = {
         setChoices([
           { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
           { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
-          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
+          { label: TEXT.CHOICE.WAIT_DAWN, action: () => die("DARK_ROOM_RETURN") }
         ]);
       }
     );
@@ -1281,7 +1300,7 @@ const SCENES = {
         setChoices([
           { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
           { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
-          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
+          { label: TEXT.CHOICE.WAIT_DAWN, action: () => die("DARK_ROOM_RETURN") }
         ]);
       }
     );
@@ -1392,7 +1411,7 @@ const SCENES = {
         setChoices([
           { label: TEXT.CHOICE.CLEAN_TOILET, action: () => goScene("soft.cleaningResult") },
           { label: TEXT.CHOICE.WAIT_PATROL, action: () => goScene("soft.patrol") },
-          { label: TEXT.CHOICE.WAIT_DAWN, action: showMorningWarning }
+          { label: TEXT.CHOICE.WAIT_DAWN, action: () => die("DARK_ROOM_RETURN") }
         ]);
       }
     );
@@ -1557,6 +1576,14 @@ function getNextNurseCallResponder() {
   return nurses[(counters.nurseCalls - 1) % nurses.length];
 }
 
+function showNurseCShortcutHintOnce(nurse, continuation) {
+  if (nurse.id !== "c" || flags.heardNurseCShortcutHint) return false;
+
+  flags.heardNurseCShortcutHint = true;
+  typeText(TEXT.SOFT_ROOM.NURSE_C_SHORTCUT_HINT, continuation);
+  return true;
+}
+
 function showNurseCallResponderChoices(nurse) {
   setChoices([
     { label: TEXT.CHOICE.TALK, action: () => talkToNurseCallResponder(nurse) },
@@ -1596,6 +1623,10 @@ function showDoorKnock() {
 // ドア越しの会話。
 // 今は会話すると死亡、黙ると紙コップイベントへ進む。
 function showDoorKnockChoices(nurse) {
+  if (showNurseCShortcutHintOnce(nurse, () => showDoorKnockChoices(nurse))) {
+    return;
+  }
+
   setChoices([
     { label: TEXT.CHOICE.CONVERSE, action: () => talkThroughDoor(nurse) },
     { label: TEXT.CHOICE.DO_NOT_CONVERSE, action: () => goScene("soft.paperCup", { nurseName: nurse.name, nurseId: nurse.id }) }
@@ -1774,10 +1805,9 @@ function showNightChoices() {
   goScene("soft.nightChoices");
 }
 
-// 夜に寝ると死亡する。
+// 寝ると日を進め、翌朝9時から白い病室を再開する。
 function sleepAtNight() {
-  findRule("nightIsDangerous");
-  die("SLEEP");
+  advanceToNextDayBySleeping();
 }
 
 // 夜のトイレイベント入口。
@@ -1824,6 +1854,10 @@ function getPatrolNurse() {
 }
 
 function showPatrolChoices(nurse) {
+  if (showNurseCShortcutHintOnce(nurse, () => showPatrolChoices(nurse))) {
+    return;
+  }
+
   if (nurse.id === "z") {
     setChoices([
       { label: TEXT.CHOICE.TALK, action: () => talkToPatrolNurse(nurse) },
@@ -1874,6 +1908,7 @@ function showEscapeProposal() {
 // ============================================================
 
 function showDoorUnlockEvent() {
+  flags.reachedDoorUnlock = true;
   goScene("door.start");
 }
 
@@ -1940,6 +1975,7 @@ function completeDoorUnlock() {
 }
 
 function showFootworkEvent() {
+  flags.reachedFootwork = true;
   goScene("footwork.start");
 }
 
@@ -2125,26 +2161,60 @@ function completeWhiteRoom() {
   startTitle();
 }
 
-function showTrialMorningDeath() {
-  stopTrialClock();
+function resetDailySceneState() {
+  flags.paperCupPlacedThisLoop = false;
+  flags.paperCupProviderIdThisLoop = null;
+  counters.hiddenLoopClicks = 0;
+  counters.cleanings = 0;
+  counters.patrols = 0;
+  counters.nurseCalls = 0;
+  pendingDoorNurse = null;
+}
+
+function setTrialClockToMorning(day) {
+  trialClock.day = day;
+  trialClock.hour = 9;
+  trialClock.minute = 0;
+  trialClock.lastMorningHandledDay = day;
+  resetDailySceneState();
+  renderTrialClock();
+}
+
+function showNextDayMorning() {
+  setTrialClockToMorning(trialClock.day);
   typeText(
-    TEXT.TRIAL_CLOCK.MORNING_DEATH,
-    () => performDeath("TRIAL_MORNING", {
-      causeId: "TRIAL_MORNING"
-    })
+    TEXT.TRIAL_CLOCK.MORNING_CONTINUE,
+    () => goScene("soft.choices")
   );
 }
 
-function showMorningWarning() {
-  findRule("morningDanger");
+function advanceToNextDayBySleeping() {
+  setTrialClockToMorning(trialClock.day + 1);
   typeText(
-    TEXT.SOFT_ROOM.MORNING_WARNING,
-    () => {
-      setChoices([
-        { label: TEXT.CHOICE.DO_NOT_MOVE, action: () => die("MORNING_STILL") },
-        { label: TEXT.CHOICE.KEEP_CLEANING, action: () => die("MORNING_CLEANING") }
-      ]);
-    }
+    TEXT.TRIAL_CLOCK.SLEEP_TO_NEXT_DAY,
+    () => goScene("soft.choices")
+  );
+}
+
+function moveTrialClockToToothbrushTime() {
+  if (
+    !TRIAL_CLOCK_CONFIG.enabled ||
+    !trialClock.active ||
+    trialClock.hour < 9 ||
+    trialClock.hour >= 20
+  ) {
+    return;
+  }
+  trialClock.hour = 20;
+  trialClock.minute = 0;
+  renderTrialClock();
+}
+
+function showMorningWarning() {
+  setTrialClockToMorning(trialClock.day + 1);
+  typeText(
+    TEXT.TRIAL_CLOCK.MORNING_CONTINUE,
+    () => goScene("soft.choices")
   );
 }
 
@@ -2221,9 +2291,23 @@ function getDangerSenseStage(causeId) {
 }
 
 // 隠し選択肢の処理。
-// 何度か押すと表示が変わり、しばらく待つと死亡ルートとして押せるようになる。
+// 到達済み区間があれば最も先の場所へショートカットする。
+// 未到達なら、従来どおり何度か押すことで表示が変わる隠しルートとして扱う。
+function getHiddenLoopShortcut() {
+  if (flags.reachedFootwork) return showFootworkEvent;
+  if (flags.reachedDoorUnlock) return showDoorUnlockEvent;
+  return null;
+}
+
 function handleHiddenLoopButton(button) {
   if (flags.loopButtonLocked) return;
+
+  const shortcut = getHiddenLoopShortcut();
+  if (shortcut) {
+    findRule("entranceShortcut");
+    shortcut();
+    return;
+  }
   counters.hiddenLoopClicks++;
   if (!button) return;
   if (counters.hiddenLoopClicks < 5) {
@@ -2384,9 +2468,9 @@ function hideRulePopup() {
 // ここで死亡回数を増やしてから、タイトルへ戻す。
 function nextLoop() {
   counters.deaths++;
-  flags.paperCupPlacedThisLoop = false;
-  flags.paperCupProviderIdThisLoop = null;
-  counters.cleanings = 0;
+  counters.nurseZDoorTalks = 0;
+  story.progress = Math.min(story.progress, STORY.SOFT_ROOM.NURSE_Z_ROUTE);
+  resetDailySceneState();
   startTitle();
 }
 
