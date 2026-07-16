@@ -228,3 +228,67 @@ button:disabled:active {
 #trial-clock[hidden] {
   display: none;
 }
+
+.footwork-cue,
+.footwork-decoy {
+  position: fixed;
+  z-index: 40;
+  min-width: 4em;
+  padding: 10px 14px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: rgba(247, 247, 247, 0.94);
+  color: #111;
+  font-size: clamp(20px, 6vw, 34px);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.footwork-cue[hidden],
+.footwork-decoy[hidden] {
+  display: none;
+}
+
+.footwork-cue.cue-left-forward,
+.footwork-decoy.cue-left-forward {
+  top: 18%;
+  left: 16%;
+}
+
+.footwork-cue.cue-right-forward,
+.footwork-decoy.cue-right-forward {
+  top: 18%;
+  left: 84%;
+}
+
+.footwork-cue.cue-left-back,
+.footwork-decoy.cue-left-back {
+  top: 78%;
+  left: 16%;
+}
+
+.footwork-cue.cue-right-back,
+.footwork-decoy.cue-right-back {
+  top: 78%;
+  left: 84%;
+}
+
+.footwork-cue.cue-center,
+.footwork-decoy.cue-center {
+  top: 48%;
+  left: 50%;
+}
+
+.footwork-decoy {
+  z-index: 39;
+  opacity: 0.9;
+}
+
+.dead .footwork-cue,
+.dead .footwork-decoy {
+  background: rgba(17, 17, 17, 0.94);
+  color: #eee;
+}

@@ -1,4 +1,4 @@
-const APP_VERSION = "ver1.23";
+const APP_VERSION = "ver0.23";
 const DEBUG = true;
 const SAVE_VERSION = 1;
 const SAVE_KEYS = {
@@ -13,7 +13,24 @@ const TRIAL_CLOCK_CONFIG = {
   showDay: true,
   startHour: 9,
   startMinute: 0,
+  morningHour: 6,
+  toothbrushHour: 20,
   minutesPerAction: 30
+};
+
+// 物語上の意味を持ち、複数箇所で共有する数値だけを定数化する。
+// 配列の長さや表示位置など、その場で意味が明らかな数値は直書きのままにする。
+const SOFT_ROOM_CONFIG = {
+  nurseZTalksToEscape: 3,
+  nurseZPatrolInterval: 3,
+  nurseCPatrolInterval: 2,
+  doorPatrolStep: 3,
+  hiddenLoopClicksToReveal: 5,
+  hiddenLoopLockMs: 5000
+};
+const DEATH_CONFIG = {
+  warnAfterSameCauseDeaths: 1,
+  refuseAfterSameCauseDeaths: 2
 };
 const ACHIEVEMENTS = [
   {
@@ -83,7 +100,10 @@ const flags = {
   nameRegistered: false,
   reachedDoorUnlock: false,
   reachedFootwork: false,
-  heardNurseCShortcutHint: false
+  heardNurseCShortcutHint: false,
+  footworkJumpUnlocked: false,
+  footworkPaymentUnlocked: false,
+  footworkDonationUnlocked: false
 };
 
 let playerName = "〇〇";
@@ -129,20 +149,27 @@ let pendingDoorNurse = null;
 const doorUnlock = {
   step: 0,
   progress: 0,
-  patrolHandled: false,
-  enemyLearned: false,
-  patternChanged: false
+  patrolHandled: false
 };
 
 // 足運びイベント用。
 const footwork = {
-  step: 0,
-  unlocked5: false,
-  unlocked6: false,
-  unlocked7: false
+  step: 0
+};
+
+const FOOTWORK_RHYTHM_CONFIG = {
+  intervalMs: 5000,
+  cueDurationMs: 2000,
+  decoyStartsAtStep: 11,
+  decoyChance: 0.15
+};
+const footworkRhythm = {
+  cueActive: false,
+  expected: null
 };
 // タイマーIDはセーブ/デバッグ対象にできないため、状態オブジェクトの外に置く。
-let footworkWaitTimer = null;
+let footworkCueStartTimer = null;
+let footworkCueEndTimer = null;
 
 // タイトル画面で表示待ちのルール/実績ポップアップ。
 let pendingRulePopups = [];
@@ -170,7 +197,6 @@ const rules = [
   { id: "morningDanger", text: "朝の音がしたら、もう遅い。", found: false },
   { id: "someNursesDiffer", text: "すべての看護師が同じではない。", found: false },
   { id: "nurseZCanHelp", text: "看護師Zは、脱出に関係している。", found: false },
-  { id: "enemyLearns", text: "一度通じたやり方が、次も通じるとは限らない。", found: false },
   { id: "entranceShortcut", text: "一度たどり着いた場所へは、入口の沈黙が近道を示す。", found: false }
 ];
 
@@ -189,6 +215,8 @@ const rulePopup = document.getElementById("rule-popup");
 const contentWarning = document.getElementById("content-warning");
 const saveInspector = document.getElementById("save-inspector");
 const trialClockDisplay = document.getElementById("trial-clock");
+const footworkCue = document.getElementById("footwork-cue");
+const footworkDecoy = document.getElementById("footwork-decoy");
 
 // ============================================================
 // 2. 画面表示と共通UI
@@ -242,8 +270,9 @@ function advanceTrialClock() {
 
   const reachedUnhandledMorning =
     trialClock.day > trialClock.lastMorningHandledDay &&
-    trialClock.hour >= 6;
+    trialClock.hour >= TRIAL_CLOCK_CONFIG.morningHour;
   if (reachedUnhandledMorning) {
+    clearFootworkRhythm();
     showNextDayMorning();
     return false;
   }
@@ -261,7 +290,10 @@ function createSaveData() {
       metNurseZOnPatrol: flags.metNurseZOnPatrol,
       reachedDoorUnlock: flags.reachedDoorUnlock,
       reachedFootwork: flags.reachedFootwork,
-      heardNurseCShortcutHint: flags.heardNurseCShortcutHint
+      heardNurseCShortcutHint: flags.heardNurseCShortcutHint,
+      footworkJumpUnlocked: flags.footworkJumpUnlocked,
+      footworkPaymentUnlocked: flags.footworkPaymentUnlocked,
+      footworkDonationUnlocked: flags.footworkDonationUnlocked
     },
     counters: {
       deaths: counters.deaths,
@@ -285,7 +317,10 @@ function getDefaultSaveData() {
       metNurseZOnPatrol: false,
       reachedDoorUnlock: false,
       reachedFootwork: false,
-      heardNurseCShortcutHint: false
+      heardNurseCShortcutHint: false,
+      footworkJumpUnlocked: false,
+      footworkPaymentUnlocked: false,
+      footworkDonationUnlocked: false
     },
     counters: {
       deaths: 0,
@@ -330,7 +365,10 @@ function normalizeSaveData(data) {
       metNurseZOnPatrol: data.flags?.metNurseZOnPatrol === true,
       reachedDoorUnlock: data.flags?.reachedDoorUnlock === true,
       reachedFootwork: data.flags?.reachedFootwork === true,
-      heardNurseCShortcutHint: data.flags?.heardNurseCShortcutHint === true
+      heardNurseCShortcutHint: data.flags?.heardNurseCShortcutHint === true,
+      footworkJumpUnlocked: data.flags?.footworkJumpUnlocked === true,
+      footworkPaymentUnlocked: data.flags?.footworkPaymentUnlocked === true,
+      footworkDonationUnlocked: data.flags?.footworkDonationUnlocked === true
     },
     counters: {
       deaths: nonNegativeInteger(data.counters?.deaths),
@@ -366,6 +404,9 @@ function applySaveData(data) {
   flags.reachedDoorUnlock = normalized.flags.reachedDoorUnlock;
   flags.reachedFootwork = normalized.flags.reachedFootwork;
   flags.heardNurseCShortcutHint = normalized.flags.heardNurseCShortcutHint;
+  flags.footworkJumpUnlocked = normalized.flags.footworkJumpUnlocked;
+  flags.footworkPaymentUnlocked = normalized.flags.footworkPaymentUnlocked;
+  flags.footworkDonationUnlocked = normalized.flags.footworkDonationUnlocked;
   counters.deaths = normalized.counters.deaths;
   counters.waterDeaths = normalized.counters.waterDeaths;
   counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
@@ -442,7 +483,7 @@ function formatSaveSlot(slot, label) {
   const data = result.data;
   return [
     `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
-    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint}`,
+    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint} footworkUnlocks=${Number(data.flags.footworkJumpUnlocked)}${Number(data.flags.footworkPaymentUnlocked)}${Number(data.flags.footworkDonationUnlocked)}`,
     `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
     `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
     `  achievements=${data.achievements.join(",") || "(none)"}`,
@@ -672,7 +713,7 @@ function restoreDebugHistory() {
   if (!snapshot) return;
   clearInterval(typingTimer);
   clearTimeout(rulePopupTimer);
-  clearTimeout(footworkWaitTimer);
+  clearFootworkRhythm();
   typingTimer = null;
   clearTextSkip();
   hideRulePopup();
@@ -731,6 +772,7 @@ function startTitle({ persist = true } = {}) {
   }
 
   stopTrialClock();
+  clearFootworkRhythm();
   document.body.className = "";
   if (saveInspector) saveInspector.hidden = true;
   title.textContent = getTitleText();
@@ -869,14 +911,20 @@ function debugPatrolZ() {
 
 function debugZDoorTalksDone() {
   advanceStoryProgress(STORY.SOFT_ROOM.ESCAPE_READY);
-  counters.nurseZDoorTalks = Math.max(counters.nurseZDoorTalks, 3);
+  counters.nurseZDoorTalks = Math.max(
+    counters.nurseZDoorTalks,
+    SOFT_ROOM_CONFIG.nurseZTalksToEscape
+  );
   findRule("nurseZCanHelp");
   showDebugMenu();
 }
 
 function debugDoorUnlock() {
   advanceStoryProgress(STORY.SOFT_ROOM.ESCAPE_READY);
-  counters.nurseZDoorTalks = Math.max(counters.nurseZDoorTalks, 3);
+  counters.nurseZDoorTalks = Math.max(
+    counters.nurseZDoorTalks,
+    SOFT_ROOM_CONFIG.nurseZTalksToEscape
+  );
   showDoorUnlockEvent();
 }
 
@@ -1290,7 +1338,7 @@ const SCENES = {
       return;
     }
     recordNurseZDoorTalk();
-    if (counters.nurseZDoorTalks >= 3) {
+    if (counters.nurseZDoorTalks >= SOFT_ROOM_CONFIG.nurseZTalksToEscape) {
       goScene("soft.escapeProposal");
       return;
     }
@@ -1320,7 +1368,6 @@ const SCENES = {
     doorUnlock.step = 0;
     doorUnlock.progress = 0;
     doorUnlock.patrolHandled = false;
-    doorUnlock.patternChanged = doorUnlock.enemyLearned;
     typeText(
       TEXT.SOFT_ROOM.DOOR_UNLOCK_START,
       () => waitForContinue(() => goScene("door.status"))
@@ -1331,7 +1378,6 @@ const SCENES = {
       time: formatTrialClock(),
       progress: doorUnlock.progress,
       gauge: getDoorUnlockGauge(),
-      patternChanged: doorUnlock.patternChanged,
       extraText
     });
     typeText(message, () => {
@@ -1373,9 +1419,7 @@ const SCENES = {
   },
   "door.patrol": ({ action }) => {
     doorUnlock.patrolHandled = true;
-    const patrolText = doorUnlock.enemyLearned
-      ? TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_LEARNED
-      : TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_FIRST;
+    const patrolText = TEXT.SOFT_ROOM.DOOR_UNLOCK_PATROL_FIRST;
     if (action === "signal") {
       goScene("door.avoidPatrol", { prefixText: patrolText });
       return;
@@ -1393,10 +1437,7 @@ const SCENES = {
     );
   },
   "door.avoidPatrol": ({ prefixText }) => {
-    doorUnlock.enemyLearned = true;
-    doorUnlock.patternChanged = true;
     rewindDoorUnlockStep(2);
-    findRule("enemyLearns");
     typeText(
       prefixText + "\n\n" + TEXT.SOFT_ROOM.DOOR_UNLOCK_AVOID,
       () => waitForContinue(() => goScene("door.status", {
@@ -1435,15 +1476,20 @@ const SCENES = {
   },
   "footwork.start": () => {
     footwork.step = 0;
-    clearTimeout(footworkWaitTimer);
-    typeText(TEXT.SOFT_ROOM.FOOTWORK_START, () => goScene("footwork.choices"));
+    clearFootworkRhythm();
+    typeText(
+      TEXT.SOFT_ROOM.FOOTWORK_START,
+      () => waitForContinue(() => goScene("footwork.choices"))
+    );
   },
   "footwork.choices": () => {
-    const expected = footworkRoute[footwork.step];
-    if (expected === "wait") {
-      goScene("footwork.wait");
+    clearFootworkRhythm();
+    if (footwork.step >= footworkRoute.length) {
+      goScene("footwork.complete");
       return;
     }
+
+    const expected = footworkRoute[footwork.step];
     const progress = `${footwork.step}/${footworkRoute.length}`;
     const footworkChoices = [
       { label: TEXT.CHOICE.LEFT_FORWARD, action: () => goScene("footwork.input", { input: "1" }) },
@@ -1451,56 +1497,29 @@ const SCENES = {
       { label: TEXT.CHOICE.LEFT_BACK, action: () => goScene("footwork.input", { input: "3" }) },
       { label: TEXT.CHOICE.RIGHT_BACK, action: () => goScene("footwork.input", { input: "4" }) }
     ];
-    if (expected === "5" && footwork.unlocked5) {
+    if (expected === "5" && isFootworkSpecialUnlocked(expected)) {
       footworkChoices.push({ label: TEXT.CHOICE.JUMP, action: () => goScene("footwork.input", { input: "5" }) });
     }
-    if (expected === "6" && footwork.unlocked6) {
+    if (expected === "6" && isFootworkSpecialUnlocked(expected)) {
       footworkChoices.push({ label: TEXT.CHOICE.CHECKOUT, action: () => goScene("footwork.input", { input: "6" }) });
     }
-    if (expected === "7" && footwork.unlocked7) {
+    if (expected === "7" && isFootworkSpecialUnlocked(expected)) {
       footworkChoices.push({ label: TEXT.CHOICE.DONATION, action: () => goScene("footwork.input", { input: "7" }) });
     }
+
     typeText(
       TEXT.SOFT_ROOM.FOOTWORK_STATUS(progress),
-      () => setChoices(footworkChoices)
-    );
-  },
-  "footwork.wait": () => {
-    typeText(
-      TEXT.SOFT_ROOM.FOOTWORK_WAIT,
       () => {
-        setChoices([
-          { label: TEXT.CHOICE.LEFT_FORWARD, action: failFootworkDuringWait },
-          { label: TEXT.CHOICE.RIGHT_FORWARD, action: failFootworkDuringWait },
-          { label: TEXT.CHOICE.LEFT_BACK, action: failFootworkDuringWait },
-          { label: TEXT.CHOICE.RIGHT_BACK, action: failFootworkDuringWait }
-        ]);
-        clearTimeout(footworkWaitTimer);
-        footworkWaitTimer = setTimeout(() => {
-          footwork.step++;
-          goScene("footwork.choices");
-        }, 5000);
+        setChoices(footworkChoices);
+        startFootworkRhythm(expected);
       }
     );
   },
-  "footwork.input": ({ input }) => {
-    const expected = footworkRoute[footwork.step];
-    clearTimeout(footworkWaitTimer);
-    if (input !== expected) {
-      unlockFootworkSpecialIfNeeded(expected);
-      die({ type: "FOOTWORK_FAIL", expected });
-      return;
-    }
-    footwork.step++;
-    if (footwork.step >= footworkRoute.length) {
-      goScene("footwork.complete");
-      return;
-    }
-    if (expected === "5" || expected === "6" || expected === "7") {
-      goScene("footwork.specialSuccess", { expected });
-      return;
-    }
+  "footwork.wait": () => {
     goScene("footwork.choices");
+  },
+  "footwork.input": ({ input }) => {
+    handleFootworkRhythmInput(input);
   },
   "footwork.specialSuccess": ({ expected }) => {
     const messages = {
@@ -1576,18 +1595,29 @@ function getNextNurseCallResponder() {
   return nurses[(counters.nurseCalls - 1) % nurses.length];
 }
 
-function showNurseCShortcutHintOnce(nurse, continuation) {
-  if (nurse.id !== "c" || flags.heardNurseCShortcutHint) return false;
+function continueAfterNurseCShortcutHintOnce(nurse, continuation) {
+  if (nurse.id !== "c" || flags.heardNurseCShortcutHint) {
+    continuation();
+    return;
+  }
 
   flags.heardNurseCShortcutHint = true;
-  typeText(TEXT.SOFT_ROOM.NURSE_C_SHORTCUT_HINT, continuation);
-  return true;
+  typeText(
+    TEXT.SOFT_ROOM.NURSE_C_SHORTCUT_HINT,
+    () => waitForContinue(continuation)
+  );
 }
 
 function showNurseCallResponderChoices(nurse) {
   setChoices([
     { label: TEXT.CHOICE.TALK, action: () => talkToNurseCallResponder(nurse) },
-    { label: TEXT.CHOICE.DO_NOT_REPLY, action: () => waitForDoorNurse(nurse) }
+    {
+      label: TEXT.CHOICE.DO_NOT_REPLY,
+      action: () => continueAfterNurseCShortcutHintOnce(
+        nurse,
+        () => waitForDoorNurse(nurse)
+      )
+    }
   ]);
 }
 
@@ -1623,10 +1653,6 @@ function showDoorKnock() {
 // ドア越しの会話。
 // 今は会話すると死亡、黙ると紙コップイベントへ進む。
 function showDoorKnockChoices(nurse) {
-  if (showNurseCShortcutHintOnce(nurse, () => showDoorKnockChoices(nurse))) {
-    return;
-  }
-
   setChoices([
     { label: TEXT.CHOICE.CONVERSE, action: () => talkThroughDoor(nurse) },
     { label: TEXT.CHOICE.DO_NOT_CONVERSE, action: () => goScene("soft.paperCup", { nurseName: nurse.name, nurseId: nurse.id }) }
@@ -1644,7 +1670,7 @@ function talkThroughDoor(nurse) {
 
 function recordNurseZDoorTalk() {
   counters.nurseZDoorTalks++;
-  if (counters.nurseZDoorTalks >= 3) {
+  if (counters.nurseZDoorTalks >= SOFT_ROOM_CONFIG.nurseZTalksToEscape) {
     advanceStoryProgress(STORY.SOFT_ROOM.ESCAPE_READY);
     findRule("nurseZCanHelp");
   }
@@ -1652,9 +1678,16 @@ function recordNurseZDoorTalk() {
 
 function talkToNurseZAtDoor() {
   recordNurseZDoorTalk();
+  const unlockedSpecial =
+    counters.nurseZDoorTalks >= SOFT_ROOM_CONFIG.nurseZTalksToEscape
+      ? unlockNextFootworkSpecialFromNurseZ()
+      : null;
+  const unlockHint = unlockedSpecial
+    ? "\n\n" + TEXT.SOFT_ROOM.NURSE_Z_FOOTWORK_UNLOCK(unlockedSpecial)
+    : "";
   pendingDoorNurse = null;
   typeText(
-    TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(counters.nurseZDoorTalks),
+    TEXT.SOFT_ROOM.NURSE_Z_DOOR_TALK(counters.nurseZDoorTalks) + unlockHint,
     () => waitForContinue(() => goScene("soft.paperCup", { nurseName: "看護師Z", nurseId: "z" }))
   );
 }
@@ -1844,20 +1877,16 @@ function waitForPatrol() {
 }
 
 function getPatrolNurse() {
-  if (isStoryProgressAtLeast(STORY.SOFT_ROOM.LOOP_AWARE) && counters.patrols % 3 === 0) {
+  if (isStoryProgressAtLeast(STORY.SOFT_ROOM.LOOP_AWARE) && counters.patrols % SOFT_ROOM_CONFIG.nurseZPatrolInterval === 0) {
     return { id: "z", name: "看護師Z" };
   }
-  if (counters.patrols % 2 === 0) {
+  if (counters.patrols % SOFT_ROOM_CONFIG.nurseCPatrolInterval === 0) {
     return { id: "c", name: "看護師C" };
   }
   return { id: "normal", name: "看護師A" };
 }
 
 function showPatrolChoices(nurse) {
-  if (showNurseCShortcutHintOnce(nurse, () => showPatrolChoices(nurse))) {
-    return;
-  }
-
   if (nurse.id === "z") {
     setChoices([
       { label: TEXT.CHOICE.TALK, action: () => talkToPatrolNurse(nurse) },
@@ -1869,7 +1898,13 @@ function showPatrolChoices(nurse) {
   }
   setChoices([
     { label: TEXT.CHOICE.TALK, action: () => talkToPatrolNurse(nurse) },
-    { label: TEXT.CHOICE.ACT_CRAZY, action: () => goScene("soft.patrolSurvive", { nurse }) },
+    {
+      label: TEXT.CHOICE.ACT_CRAZY,
+      action: () => continueAfterNurseCShortcutHintOnce(
+        nurse,
+        () => goScene("soft.patrolSurvive", { nurse })
+      )
+    },
     { label: TEXT.CHOICE.ACT_NORMAL, action: () => die({ type: "PATROL_NORMAL_SURVIVE_FAIL", nurseName: nurse.name }) },
     { label: TEXT.CHOICE.LOOK_DOOR, action: lookAtDoor }
   ]);
@@ -1923,12 +1958,7 @@ function getDoorUnlockHintSequence(route = baseDoorUnlockRoute) {
 }
 
 function getDoorUnlockRoute() {
-  if (!doorUnlock.patternChanged) return baseDoorUnlockRoute;
-  return baseDoorUnlockRoute.map(action => {
-    if (action === "push") return "pull";
-    if (action === "pull") return "push";
-    return action;
-  });
+  return baseDoorUnlockRoute;
 }
 
 function getDoorUnlockGauge() {
@@ -1951,7 +1981,7 @@ function handleDoorUnlockAction(action) {
 }
 
 function shouldDoorUnlockPatrolArrive() {
-  return !doorUnlock.patrolHandled && doorUnlock.step >= 3;
+  return !doorUnlock.patrolHandled && doorUnlock.step >= SOFT_ROOM_CONFIG.doorPatrolStep;
 }
 
 function triggerDoorUnlockPatrol(action) {
@@ -1984,12 +2014,11 @@ function showFootworkChoices() {
 }
 
 function showFootworkWaitTurn() {
-  goScene("footwork.wait");
+  goScene("footwork.choices");
 }
 
 function failFootworkDuringWait() {
-  clearTimeout(footworkWaitTimer);
-  die("FOOTWORK_WAIT_FAIL");
+  rewindFootworkAndContinue();
 }
 
 function handleFootworkInput(input) {
@@ -2000,10 +2029,182 @@ function showFootworkSpecialSuccess(expected) {
   goScene("footwork.specialSuccess", { expected });
 }
 
+function isFootworkSpecial(expected) {
+  return expected === "5" || expected === "6" || expected === "7";
+}
+
+function isFootworkSpecialUnlocked(expected) {
+  if (expected === "5") return flags.footworkJumpUnlocked;
+  if (expected === "6") return flags.footworkPaymentUnlocked;
+  if (expected === "7") return flags.footworkDonationUnlocked;
+  return true;
+}
+
 function unlockFootworkSpecialIfNeeded(expected) {
-  if (expected === "5") footwork.unlocked5 = true;
-  if (expected === "6") footwork.unlocked6 = true;
-  if (expected === "7") footwork.unlocked7 = true;
+  if (expected === "5") flags.footworkJumpUnlocked = true;
+  if (expected === "6") flags.footworkPaymentUnlocked = true;
+  if (expected === "7") flags.footworkDonationUnlocked = true;
+}
+
+function unlockNextFootworkSpecialFromNurseZ() {
+  const unlockOrder = ["5", "6", "7"];
+  const nextSpecial = unlockOrder.find(expected => !isFootworkSpecialUnlocked(expected));
+  if (!nextSpecial) return null;
+  unlockFootworkSpecialIfNeeded(nextSpecial);
+  return nextSpecial;
+}
+
+function getFootworkCuePosition(expected) {
+  const positions = {
+    "1": "left-forward",
+    "2": "right-forward",
+    "3": "left-back",
+    "4": "right-back"
+  };
+  return positions[expected] || "center";
+}
+
+function hideFootworkCue() {
+  if (footworkCue) {
+    footworkCue.hidden = true;
+    footworkCue.className = "footwork-cue";
+    footworkCue.textContent = "";
+  }
+  if (footworkDecoy) {
+    footworkDecoy.hidden = true;
+    footworkDecoy.className = "footwork-decoy";
+    footworkDecoy.textContent = "";
+  }
+}
+
+function clearFootworkRhythm() {
+  clearTimeout(footworkCueStartTimer);
+  clearTimeout(footworkCueEndTimer);
+  footworkCueStartTimer = null;
+  footworkCueEndTimer = null;
+  footworkRhythm.cueActive = false;
+  footworkRhythm.expected = null;
+  hideFootworkCue();
+}
+
+function getFootworkDecoyPosition(expected) {
+  const positions = [
+    "left-forward",
+    "right-forward",
+    "left-back",
+    "right-back"
+  ];
+  const correctPosition = getFootworkCuePosition(expected);
+  const candidates = positions.filter(position => position !== correctPosition);
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function showFootworkDecoy(expected) {
+  if (
+    !footworkDecoy ||
+    footwork.step < FOOTWORK_RHYTHM_CONFIG.decoyStartsAtStep ||
+    Math.random() >= FOOTWORK_RHYTHM_CONFIG.decoyChance
+  ) {
+    return;
+  }
+
+  const decoyTexts = TEXT.UI.FOOTWORK_DECOYS;
+  footworkDecoy.className =
+    `footwork-decoy cue-${getFootworkDecoyPosition(expected)}`;
+  footworkDecoy.textContent =
+    decoyTexts[Math.floor(Math.random() * decoyTexts.length)];
+  footworkDecoy.hidden = false;
+}
+
+function showFootworkCue(expected) {
+  if (footworkCue) {
+    footworkCue.className = `footwork-cue cue-${getFootworkCuePosition(expected)}`;
+    footworkCue.textContent =
+      expected === "wait" ? TEXT.UI.FOOTWORK_STOP : TEXT.UI.FOOTWORK_NOW;
+    footworkCue.hidden = false;
+  }
+  showFootworkDecoy(expected);
+}
+
+function startFootworkRhythm(expected) {
+  clearFootworkRhythm();
+  footworkRhythm.expected = expected;
+
+  const leadTime =
+    FOOTWORK_RHYTHM_CONFIG.intervalMs -
+    FOOTWORK_RHYTHM_CONFIG.cueDurationMs;
+
+  footworkCueStartTimer = setTimeout(() => {
+    footworkRhythm.cueActive = true;
+    showFootworkCue(expected);
+
+    footworkCueEndTimer = setTimeout(() => {
+      footworkRhythm.cueActive = false;
+      hideFootworkCue();
+      handleFootworkRhythmTimeout(expected);
+    }, FOOTWORK_RHYTHM_CONFIG.cueDurationMs);
+  }, Math.max(0, leadTime));
+}
+
+function handleLockedFootworkSpecial(expected) {
+  clearFootworkRhythm();
+  die(
+    { type: "FOOTWORK_FAIL", expected },
+    { beforeDeath: () => unlockFootworkSpecialIfNeeded(expected) }
+  );
+}
+
+function rewindFootworkAndContinue() {
+  clearFootworkRhythm();
+  footwork.step = Math.max(0, footwork.step - 1);
+  goScene("footwork.choices");
+}
+
+function advanceFootworkStep(expected) {
+  clearFootworkRhythm();
+  footwork.step++;
+
+  if (footwork.step >= footworkRoute.length) {
+    goScene("footwork.complete");
+    return;
+  }
+  if (isFootworkSpecial(expected)) {
+    goScene("footwork.specialSuccess", { expected });
+    return;
+  }
+  goScene("footwork.choices");
+}
+
+function handleFootworkRhythmTimeout(expected) {
+  if (footworkRhythm.expected !== expected) return;
+
+  if (expected === "wait") {
+    advanceFootworkStep(expected);
+    return;
+  }
+  if (isFootworkSpecial(expected) && !isFootworkSpecialUnlocked(expected)) {
+    handleLockedFootworkSpecial(expected);
+    return;
+  }
+  rewindFootworkAndContinue();
+}
+
+function handleFootworkRhythmInput(input) {
+  const expected = footworkRoute[footwork.step];
+
+  if (isFootworkSpecial(expected) && !isFootworkSpecialUnlocked(expected)) {
+    handleLockedFootworkSpecial(expected);
+    return;
+  }
+  if (
+    !footworkRhythm.cueActive ||
+    expected === "wait" ||
+    input !== expected
+  ) {
+    rewindFootworkAndContinue();
+    return;
+  }
+  advanceFootworkStep(expected);
 }
 
 function showCarApproach() {
@@ -2173,8 +2374,8 @@ function resetDailySceneState() {
 
 function setTrialClockToMorning(day) {
   trialClock.day = day;
-  trialClock.hour = 9;
-  trialClock.minute = 0;
+  trialClock.hour = TRIAL_CLOCK_CONFIG.startHour;
+  trialClock.minute = TRIAL_CLOCK_CONFIG.startMinute;
   trialClock.lastMorningHandledDay = day;
   resetDailySceneState();
   renderTrialClock();
@@ -2200,12 +2401,12 @@ function moveTrialClockToToothbrushTime() {
   if (
     !TRIAL_CLOCK_CONFIG.enabled ||
     !trialClock.active ||
-    trialClock.hour < 9 ||
-    trialClock.hour >= 20
+    trialClock.hour < TRIAL_CLOCK_CONFIG.startHour ||
+    trialClock.hour >= TRIAL_CLOCK_CONFIG.toothbrushHour
   ) {
     return;
   }
-  trialClock.hour = 20;
+  trialClock.hour = TRIAL_CLOCK_CONFIG.toothbrushHour;
   trialClock.minute = 0;
   renderTrialClock();
 }
@@ -2224,69 +2425,71 @@ function showMorningWarning() {
 
 // 死亡メッセージ解決関数。
 // TEXT.DEATH のキーまたはオブジェクトを受け取り、表示用文字列を返す。
-function resolveDeathMessage(reason) {
+function resolveDeath(reason) {
   if (typeof reason === "string") {
     if (!TEXT.DEATH[reason]) {
       throw new Error(`Unknown death key: ${reason}`);
     }
-    return TEXT.DEATH[reason];
+    return {
+      causeId: reason,
+      message: TEXT.DEATH[reason],
+      skipsDeathSuffix: reason === "LOOP_QUESTION"
+    };
   }
 
   if (!reason || typeof reason !== "object") {
     throw new Error("Death reason must be a TEXT.DEATH key or typed object.");
   }
 
-  // オブジェクトでパラメータ付き死亡の場合
+  let causeId = reason.type;
+  let message;
+
   switch (reason.type) {
     case "NORMAL_NURSE_CALL_TALK":
-      return TEXT.DEATH.NORMAL_NURSE_CALL_TALK(reason.nurseName);
+      message = TEXT.DEATH.NORMAL_NURSE_CALL_TALK(reason.nurseName);
+      break;
     case "DOOR_WATCHERS":
-      return TEXT.DEATH.DOOR_WATCHERS(reason.count);
+      message = TEXT.DEATH.DOOR_WATCHERS(reason.count);
+      break;
     case "PATROL_NORMAL_TALK":
-      return TEXT.DEATH.PATROL_NORMAL_TALK(reason.nurseName);
+      message = TEXT.DEATH.PATROL_NORMAL_TALK(reason.nurseName);
+      break;
     case "PATROL_NORMAL_SURVIVE_FAIL":
-      return TEXT.DEATH.PATROL_NORMAL_SURVIVE_FAIL(reason.nurseName);
-    case "FOOTWORK_FAIL": {
-      const e = reason.expected;
-      if (e === "5") return TEXT.DEATH.FOOTWORK_JUMP_FAIL;
-      if (e === "6") return TEXT.DEATH.FOOTWORK_PAY_FAIL;
-      if (e === "7") return TEXT.DEATH.FOOTWORK_DONATE_FAIL;
-      return TEXT.DEATH.FOOTWORK_TOUCH;
-    }
+      message = TEXT.DEATH.PATROL_NORMAL_SURVIVE_FAIL(reason.nurseName);
+      break;
+    case "FOOTWORK_FAIL":
+      if (reason.expected === "5") {
+        causeId = "FOOTWORK_JUMP_FAIL";
+        message = TEXT.DEATH.FOOTWORK_JUMP_FAIL;
+      } else if (reason.expected === "6") {
+        causeId = "FOOTWORK_PAY_FAIL";
+        message = TEXT.DEATH.FOOTWORK_PAY_FAIL;
+      } else if (reason.expected === "7") {
+        causeId = "FOOTWORK_DONATE_FAIL";
+        message = TEXT.DEATH.FOOTWORK_DONATE_FAIL;
+      } else {
+        causeId = "FOOTWORK_TOUCH";
+        message = TEXT.DEATH.FOOTWORK_TOUCH;
+      }
+      break;
     case "GENERIC":
-      return TEXT.DEATH.GENERIC(reason.reason);
+      if (typeof reason.causeId !== "string" || !reason.causeId) {
+        throw new Error("GENERIC death reason requires causeId.");
+      }
+      causeId = reason.causeId;
+      message = TEXT.DEATH.GENERIC(reason.reason);
+      break;
     default:
       throw new Error(`Unknown death type: ${reason.type}`);
   }
-}
 
-function getDeathCauseId(reason) {
-  if (typeof reason === "string") return reason;
-  if (!reason || typeof reason !== "object") {
-    throw new Error("Death reason must be a TEXT.DEATH key or typed object.");
-  }
-
-  if (reason.type === "FOOTWORK_FAIL") {
-    if (reason.expected === "5") return "FOOTWORK_JUMP_FAIL";
-    if (reason.expected === "6") return "FOOTWORK_PAY_FAIL";
-    if (reason.expected === "7") return "FOOTWORK_DONATE_FAIL";
-    return "FOOTWORK_TOUCH";
-  }
-
-  if (reason.type === "GENERIC") {
-    if (typeof reason.causeId !== "string" || !reason.causeId) {
-      throw new Error("GENERIC death reason requires causeId.");
-    }
-    return reason.causeId;
-  }
-
-  return reason.type;
+  return { causeId, message, skipsDeathSuffix: false };
 }
 
 function getDangerSenseStage(causeId) {
   const previousDeaths = deathCauseCounts[causeId] || 0;
-  if (previousDeaths >= 2) return "refuse";
-  if (previousDeaths >= 1) return "warn";
+  if (previousDeaths >= DEATH_CONFIG.refuseAfterSameCauseDeaths) return "refuse";
+  if (previousDeaths >= DEATH_CONFIG.warnAfterSameCauseDeaths) return "warn";
   return "none";
 }
 
@@ -2305,12 +2508,15 @@ function handleHiddenLoopButton(button) {
   const shortcut = getHiddenLoopShortcut();
   if (shortcut) {
     findRule("entranceShortcut");
-    shortcut();
+    typeText(
+      TEXT.SOFT_ROOM.NURSE_C_SHORTCUT_WARP,
+      () => waitForContinue(shortcut)
+    );
     return;
   }
   counters.hiddenLoopClicks++;
   if (!button) return;
-  if (counters.hiddenLoopClicks < 5) {
+  if (counters.hiddenLoopClicks < SOFT_ROOM_CONFIG.hiddenLoopClicksToReveal) {
     button.textContent = "4 " + "……".repeat(counters.hiddenLoopClicks + 1);
     return;
   }
@@ -2322,7 +2528,7 @@ function handleHiddenLoopButton(button) {
     button.disabled = false;
     flags.loopButtonLocked = false;
     button.onclick = () => die("LOOP_QUESTION");
-  }, 5000);
+  }, SOFT_ROOM_CONFIG.hiddenLoopLockMs);
 }
 
 // 死亡イベント。
@@ -2346,30 +2552,29 @@ function restoreDangerSenseScreen(snapshot) {
   setChoices(snapshot.choiceItems);
 }
 
-function performDeath(reason, { causeId, beforeDeath = null, showWarning = false } = {}) {
+function performDeath(death, { beforeDeath = null, showWarning = false } = {}) {
   stopTrialClock();
+  clearFootworkRhythm();
   if (typeof beforeDeath === "function") beforeDeath();
-  deathCauseCounts[causeId] = (deathCauseCounts[causeId] || 0) + 1;
+  deathCauseCounts[death.causeId] = (deathCauseCounts[death.causeId] || 0) + 1;
 
   document.body.className = "dead";
   hideRulePopup();
   title.textContent = "";
   findRule("deathLoops");
 
-  if (reason === "LOOP_QUESTION") {
+  if (death.skipsDeathSuffix) {
     findRule("findOwnWay");
     advanceStoryProgress(STORY.SOFT_ROOM.LOOP_AWARE);
   }
 
-  if (counters.deaths >= 1 || reason === "LOOP_QUESTION") {
+  if (counters.deaths >= 1 || death.skipsDeathSuffix) {
     findRule("loopChanges");
   }
 
-  const resolved = resolveDeathMessage(reason);
-  const deathMessage =
-    reason === "LOOP_QUESTION"
-      ? resolved
-      : `${resolved}\n\n死亡。`;
+  const deathMessage = death.skipsDeathSuffix
+    ? death.message
+    : `${death.message}\n\n死亡。`;
   const message = showWarning
     ? `${TEXT.UI.DANGER_SENSE_WARNING}\n\n${deathMessage}`
     : deathMessage;
@@ -2382,8 +2587,8 @@ function performDeath(reason, { causeId, beforeDeath = null, showWarning = false
 }
 
 function die(reason, { beforeDeath = null } = {}) {
-  const causeId = getDeathCauseId(reason);
-  const dangerSenseStage = getDangerSenseStage(causeId);
+  const death = resolveDeath(reason);
+  const dangerSenseStage = getDangerSenseStage(death.causeId);
 
   if (dangerSenseStage === "refuse") {
     const snapshot = captureDangerSenseScreen();
@@ -2391,7 +2596,7 @@ function die(reason, { beforeDeath = null } = {}) {
       setChoices([
         {
           label: TEXT.CHOICE.DO_IT_ANYWAY,
-          action: () => performDeath(reason, { causeId, beforeDeath }),
+          action: () => performDeath(death, { beforeDeath }),
           advancesTime: false
         },
         {
@@ -2405,8 +2610,7 @@ function die(reason, { beforeDeath = null } = {}) {
     return;
   }
 
-  performDeath(reason, {
-    causeId,
+  performDeath(death, {
     beforeDeath,
     showWarning: dangerSenseStage === "warn"
   });

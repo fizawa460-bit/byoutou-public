@@ -10,6 +10,9 @@ const TEXT = {
     CONTENT_WARNING: "この物語は、精神的につらい体験を題材にしています。少し距離を置いて遊んでください。",
     DANGER_SENSE_WARNING: "……嫌な予感がする。",
     DANGER_SENSE_REFUSAL: "……これは、もう嫌だ。",
+    FOOTWORK_NOW: "いま！",
+    FOOTWORK_STOP: "止まれ",
+    FOOTWORK_DECOYS: ["いけ！", "やま！", "いや！"],
     NAME_REGISTERED: (name) => textBlock([
       `${name}ですね。`,
       "登録しました。",
@@ -312,8 +315,14 @@ const TEXT = {
       "「〇〇さん、どうしました？」"
     ]),
     NURSE_C_SHORTCUT_HINT: textBlock([
-      "看護師C「今の君には、まだ関係ない独り言だが。」",
-      "看護師C「扉に手をかけた者には、入口の沈黙が近道を教えるらしいぞ。」"
+      "少し間があった。看護師Cは、小さい声で話し始めた",
+      "看護師C「..独り言だが」",
+      "看護師C「扉に手をかけた者には、入口の沈黙が近道らしいぞ。」"
+    ]),
+    NURSE_C_SHORTCUT_WARP: textBlock([
+      "看護師C「お。見つけたか。連れてってやる。」",
+      "パン！",
+      "猫騙しをされた。"
     ]),
     DOOR_KNOCK: (nurse) => textBlock([
       "放送が切れた。",
@@ -433,13 +442,12 @@ const TEXT = {
     ]),
     TOILET_PAPER: textBlock([
       "用を足した。",
-      "ペーパーをどう流すべきか、分からない。"
+      "なぜかペーパーを、このまま流してはいけない気がする。"
     ]),
     CLEANING_PREVIEW: textBlock([
-      "ペーパーを細かく砕いて、少しずつ流した。",
-      "水音は小さかった。",
-      "だが、布団へ戻るには暗すぎる。",
-      "やることがない。"
+      "ペーパーを細かくして、トイレの水をかき混ぜた。",
+      "ペーパーがドロドロになった。",
+      "..布団へ戻るには暗すぎる。"
     ]),
     CLEANING_RESULT: textBlock([
       "トイレを磨いた。",
@@ -472,6 +480,14 @@ const TEXT = {
         "生きている。"
       ]);
     },
+    NURSE_Z_FOOTWORK_UNLOCK: (expected) => {
+      const lines = {
+        "5": "……進むだけが、足運びではないそうです。",
+        "6": "……出ていく時は会計をして下さいね。",
+        "7": "……支払いのお釣りは受け取らないようにして下さい。"
+      };
+      return `看護師Z「${lines[expected]}」`;
+    },
     ESCAPE_PROPOSAL: textBlock([
       "看護師Zは、トイレの入口で立ち止まった。",
       "「今なら、少しだけ開けられます。」",
@@ -493,12 +509,6 @@ const TEXT = {
       "看護師Zの手が止まる。",
       "ガチャガチャ。"
     ]),
-    DOOR_UNLOCK_PATROL_LEARNED: textBlock([
-      "音はしなかった。",
-      "けれど、ドアの外側の空気だけが急に重くなった。",
-      "ゆっくり、別の手がドアへ触れる。",
-      "ガチャガチャ。"
-    ]),
     DOOR_UNLOCK_PATROL_PROMPT: textBlock([
       "解除率が戻った。",
       "今、何かを伝えないといけない。"
@@ -506,8 +516,8 @@ const TEXT = {
     DOOR_UNLOCK_AVOID: textBlock([
       "ドアの向こうで、看護師Zの息が消えた。",
       "巡回は、そこに何もいないみたいに通り過ぎた。",
-      "でも、ドアの中の手応えが変わった。",
-      "さっきまでのやり方は、少しだけ潰された。"
+      "ドアの中には、さっきまでの手応えが残っている。",
+      "同じやり方を、もう一度たどれそうだ。"
     ]),
     DOOR_UNLOCK_FAIL: textBlock([
       "看護師Z「ごめんなさい。今日はもう無理です。」",
@@ -522,23 +532,21 @@ const TEXT = {
       "開いたドアの内側に、薄く文字が書かれている。",
       "「ここから出ても、終わりじゃない。」",
       "「次は、壁を見ろ。」",
-      "――〇〇"
+      "――〇〇",
+      "書いた記憶がない..."
     ]),
     DOOR_UNLOCK_MORNING: textBlock([
       "廊下の奥で、朝の気配がした。",
       "看護師Z「すみません。時間です。」",
       "ドアの向こうの気配が、ゆっくり離れていく。"
     ]),
-    DOOR_UNLOCK_STATUS: ({ time, progress, gauge, patternChanged, extraText = "" }) => {
-      const nurseCHint = patternChanged ? "\n\n看護師C「逆。」" : "";
-      return textBlock([
-        extraText,
-        `時刻: ${time}`,
-        `解除率: ${progress}%`,
-        gauge,
-        "ドアの向こうで、看護師Zが息を殺している。" + nurseCHint
-      ].filter(Boolean));
-    },
+    DOOR_UNLOCK_STATUS: ({ time, progress, gauge, extraText = "" }) => textBlock([
+      extraText,
+      `時刻: ${time}`,
+      `解除率: ${progress}%`,
+      gauge,
+      "ドアの向こうで、看護師Zが息を殺している。"
+    ].filter(Boolean)),
     DOOR_UNLOCK_WRONG_ACTION: textBlock([
       "ドアノブが、乾いた音を立てた。",
       "向こう側で、看護師Zが手を離す気配がした。"
