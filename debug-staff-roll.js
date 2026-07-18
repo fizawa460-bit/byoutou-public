@@ -39,62 +39,90 @@ function getDebugStaffRollPersonCharacter(x, y, progress, center) {
   const top = 1 + 8 * eased;
   const seconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
   const gait = Math.sin(seconds * Math.PI * 3.2);
-  const shoulderSway = Math.sin(seconds * Math.PI * 3.2 + Math.PI / 2);
-  const personCenter = center + shoulderSway * scale * 0.35;
+  const bodySway = Math.sin(seconds * Math.PI * 3.2 + Math.PI / 2);
+  const personCenter = center + bodySway * scale * 0.12;
   const px = (x - personCenter) / scale;
   const py = (y - top) / scale;
+  const outlineThickness = Math.max(0.36, 0.7 / Math.max(scale, 0.45));
 
-  // 後頭部。中央を少し明るくし、髪の密度に丸みを付ける。
+  // 輪郭を中心に描き、顔・服の内側は空白として残す。
   const headValue = (px / 4.25) ** 2 + ((py - 5) / 5.1) ** 2;
-  if (headValue <= 1) {
-    if (py < 5.8 || Math.abs(px) > 3.15) return "@";
-    return Math.abs(px) < 1.35 ? "#" : "%";
+  if (Math.abs(headValue - 1) <= outlineThickness * 0.28) {
+    return py < 6.4 ? "@" : "#";
+  }
+  // 後頭部には輪郭を崩さない程度の、まばらな髪の線だけを置く。
+  if (headValue < 0.82 && py < 5.8) {
+    const hairPattern = Math.abs(Math.round(px * 2 + py * 3)) % 7;
+    if (hairPattern === 0) return ".";
+  }
+  if (headValue < 1) return " ";
+
+  if (py >= 9.2 && py <= 12.7) {
+    if (Math.abs(Math.abs(px) - 2.15) <= outlineThickness) return "|";
   }
 
-  // 首。
-  if (py >= 9 && py <= 13 && Math.abs(px) <= 2.25) {
-    return Math.abs(px) < 0.8 ? "*" : "#";
-  }
-
-  // 肩から腰まで。最初は下半身が画面外なので、腰から上だけが大きく映る。
-  if (py >= 11.5 && py <= 25.5) {
-    const halfWidth = 8.4 - (py - 11.5) * 0.2;
-    if (Math.abs(px) <= halfWidth) {
-      const edge = Math.abs(px) / halfWidth;
-      if (py < 14 && edge > 0.72) return "%";
-      if (edge > 0.84) return "+";
-      if (Math.abs(px) < 1.1) return "*";
-      return edge < 0.48 ? "#" : "%";
+  // 肩と胴体。中央は塗らず、外周とわずかな服のしわだけにする。
+  if (py >= 11.8 && py <= 25.7) {
+    const halfWidth = 8.35 - (py - 11.8) * 0.2;
+    if (Math.abs(Math.abs(px) - halfWidth) <= outlineThickness) {
+      return px < 0 ? "/" : "\\";
     }
+    if (py < 13.2 && Math.abs(Math.abs(px) - 5.2) <= outlineThickness) {
+      return "_";
+    }
+    if (Math.abs(px) < 0.45 && py > 17 && py < 23 && Math.round(py) % 4 === 0) {
+      return ".";
+    }
+    if (Math.abs(px) < halfWidth) return " ";
   }
 
-  // 腕は歩行に合わせて前後へ振る。背面なので動きは小さくする。
-  const leftHandX = -6.1 + gait * 2.2;
-  const rightHandX = 6.1 - gait * 2.2;
-  const leftArm = getDebugStaffRollSegmentDistance(px, py, -7.2, 13, leftHandX, 25.5);
-  const rightArm = getDebugStaffRollSegmentDistance(px, py, 7.2, 13, rightHandX, 25.5);
-  if (leftArm <= 1.15 || rightArm <= 1.15) {
-    return edgeCharacterForDebugStaffRoll(px);
+  // 腕は横へ振らず、片方を長く濃く、もう片方を短く薄くして前後運動を表す。
+  const leftNear = gait >= 0;
+  const leftReach = leftNear ? 27.2 : 22.8;
+  const rightReach = leftNear ? 22.8 : 27.2;
+  const leftElbowY = leftNear ? 19.3 : 18.1;
+  const rightElbowY = leftNear ? 18.1 : 19.3;
+  const leftArmDistance = Math.min(
+    getDebugStaffRollSegmentDistance(px, py, -7.15, 13.1, -7.0, leftElbowY),
+    getDebugStaffRollSegmentDistance(px, py, -7.0, leftElbowY, -6.65, leftReach)
+  );
+  const rightArmDistance = Math.min(
+    getDebugStaffRollSegmentDistance(px, py, 7.15, 13.1, 7.0, rightElbowY),
+    getDebugStaffRollSegmentDistance(px, py, 7.0, rightElbowY, 6.65, rightReach)
+  );
+  if (leftArmDistance <= outlineThickness * (leftNear ? 1.05 : 0.72)) {
+    return leftNear ? "#" : ".";
+  }
+  if (rightArmDistance <= outlineThickness * (leftNear ? 0.72 : 1.05)) {
+    return leftNear ? "." : "#";
   }
 
-  // 腰から先は、人物が遠ざかって全身が画面へ収まった後に見えてくる。
-  const leftKneeX = -2.1 + gait * 1.5;
-  const rightKneeX = 2.1 - gait * 1.5;
-  const leftFootX = -3.2 + gait * 3.2;
-  const rightFootX = 3.2 - gait * 3.2;
-  const leftUpperLeg = getDebugStaffRollSegmentDistance(px, py, -2.7, 24, leftKneeX, 32);
-  const leftLowerLeg = getDebugStaffRollSegmentDistance(px, py, leftKneeX, 32, leftFootX, 40);
-  const rightUpperLeg = getDebugStaffRollSegmentDistance(px, py, 2.7, 24, rightKneeX, 32);
-  const rightLowerLeg = getDebugStaffRollSegmentDistance(px, py, rightKneeX, 32, rightFootX, 40);
-  if (Math.min(leftUpperLeg, leftLowerLeg, rightUpperLeg, rightLowerLeg) <= 1.35) {
-    return "#";
+  // 脚も左右へ開かず、奥側を短く胴体へ隠して前後の一歩に見せる。
+  const leftFootY = leftNear ? 40 : 36.4;
+  const rightFootY = leftNear ? 36.4 : 40;
+  const leftKneeY = leftNear ? 32.2 : 30.2;
+  const rightKneeY = leftNear ? 30.2 : 32.2;
+  const leftLegDistance = Math.min(
+    getDebugStaffRollSegmentDistance(px, py, -2.45, 24.2, -2.35, leftKneeY),
+    getDebugStaffRollSegmentDistance(px, py, -2.35, leftKneeY, -2.15, leftFootY)
+  );
+  const rightLegDistance = Math.min(
+    getDebugStaffRollSegmentDistance(px, py, 2.45, 24.2, 2.35, rightKneeY),
+    getDebugStaffRollSegmentDistance(px, py, 2.35, rightKneeY, 2.15, rightFootY)
+  );
+  if (leftLegDistance <= outlineThickness * (leftNear ? 1.1 : 0.72)) {
+    return leftNear ? "#" : ".";
   }
+  if (rightLegDistance <= outlineThickness * (leftNear ? 0.72 : 1.1)) {
+    return leftNear ? "." : "#";
+  }
+
+  // 腰と靴底だけを短い横線で結び、輪郭の読みやすさを保つ。
+  if (py >= 24 && py <= 25.1 && Math.abs(px) <= 3.1) return "_";
+  if (leftNear && Math.abs(py - leftFootY) <= outlineThickness && px >= -3.5 && px <= -1.1) return "_";
+  if (!leftNear && Math.abs(py - rightFootY) <= outlineThickness && px >= 1.1 && px <= 3.5) return "_";
 
   return null;
-}
-
-function edgeCharacterForDebugStaffRoll(value) {
-  return Math.abs(value) < 3 ? "#" : "%";
 }
 
 function createDebugStaffRollFrame(progress) {
