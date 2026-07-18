@@ -73,10 +73,10 @@ const TEXT = {
     SILENT: "黙る",
     CLOSE_EYES: "目を閉じる",
     OPEN_EYES: "目を開ける",
-    LEFT_FORWARD: "左前",
-    RIGHT_FORWARD: "右前",
-    LEFT_BACK: "左後",
-    RIGHT_BACK: "右後",
+    LEFT_FORWARD: "左足・前",
+    RIGHT_FORWARD: "右足・前",
+    LEFT_BACK: "左足・後",
+    RIGHT_BACK: "右足・後",
     JUMP: "ジャンプ",
     CHECKOUT: "会計お願いします。",
     DONATION: "募金はこちらへ。",
@@ -449,11 +449,18 @@ const TEXT = {
       "ペーパーがドロドロになった。",
       "..布団へ戻るには暗すぎる。"
     ]),
-    CLEANING_RESULT: textBlock([
-      "トイレを磨いた。",
-      "白い陶器が、少しだけ白すぎるものになった。",
-      "どこかで、誰かが息を止めた気がした。"
-    ]),
+    CLEANING_RESULT: (cleaningCount) => {
+      const soundsByCount = {
+        1: "閉ざされたドアの向こうから、誰かが息を呑んだような音が聞こえた。",
+        2: "閉ざされたドアが、ほんの少し動いたような音が聞こえた。",
+        5: "閉ざされたドアの向こうで、誰かが床に倒れたような重い音がした。"
+      };
+      return textBlock([
+        "トイレを磨いた。",
+        "白い陶器が、少しだけ白すぎるものになった。",
+        soundsByCount[cleaningCount]
+      ].filter(Boolean));
+    },
     PATROL_APPROACH: (nurseName) => textBlock([
       "廊下の向こうから、足音が近づいてきた。",
       `${nurseName}が、トイレの入口で止まった。`
@@ -468,25 +475,23 @@ const TEXT = {
       "それだけ言って、足音は遠ざかった。",
       "生きている。"
     ]),
-    NURSE_Z_DOOR_TALK: (talkCount) => {
+    NURSE_Z_DOOR_TALK: (talkCount, unlockedSpecial = null) => {
+      const specialLines = {
+        "5": "……進むだけが、足運びではないそうです。",
+        "6": "……出ていく時は会計をして下さいね。",
+        "7": "……支払いのお釣りは受け取らないようにして下さい。"
+      };
       const line =
-        talkCount >= 3 ? "今夜ドアの前で待っていてください。" :
+        specialLines[unlockedSpecial] ||
+        (talkCount >= 3 ? "今夜ドアの前で待っていてください。" :
         talkCount === 2 ? "もう少し待ってください。" :
-        "今はまだ、開けられません。";
+        "今はまだ、開けられません。");
       return textBlock([
         "看護師Zは、ドアの向こうで少しだけ声を落とした。",
         `看護師Z「${line}」`,
         "それだけ言って、足音は遠ざかった。",
         "生きている。"
       ]);
-    },
-    NURSE_Z_FOOTWORK_UNLOCK: (expected) => {
-      const lines = {
-        "5": "……進むだけが、足運びではないそうです。",
-        "6": "……出ていく時は会計をして下さいね。",
-        "7": "……支払いのお釣りは受け取らないようにして下さい。"
-      };
-      return `看護師Z「${lines[expected]}」`;
     },
     ESCAPE_PROPOSAL: textBlock([
       "看護師Zは、トイレの入口で立ち止まった。",
@@ -514,8 +519,10 @@ const TEXT = {
       "今、何かを伝えないといけない。"
     ]),
     DOOR_UNLOCK_AVOID: textBlock([
+      "足音が、すぐそばまで来た。",
       "ドアの向こうで、看護師Zの息が消えた。",
-      "巡回は、そこに何もいないみたいに通り過ぎた。",
+      "向こう側の手応えが、一瞬だけ震えた気がした。",
+      "巡回は、そこに何もいないように通り過ぎた。",
       "ドアの中には、さっきまでの手応えが残っている。",
       "同じやり方を、もう一度たどれそうだ。"
     ]),
@@ -552,12 +559,24 @@ const TEXT = {
       "向こう側で、看護師Zが手を離す気配がした。"
     ]),
     DOOR_UNLOCK_PATROL_SIGNAL: "「息を止めて。」",
-    DOOR_UNLOCK_PATROL_STAY: "看護師Zは、そのまま動かなかった。",
-    DOOR_UNLOCK_PATROL_HURRY: "看護師Zの指が、ドアに当たった。",
-    DOOR_UNLOCK_PATROL_SILENT: "何も伝えられなかった。",
+    DOOR_UNLOCK_PATROL_STAY: textBlock([
+      "看護師Zは、そのまま動かなかった。",
+      "反応が一瞬だけ遅れ、向こう側で鍵が元へ戻る音がした。"
+    ]),
+    DOOR_UNLOCK_PATROL_HURRY: textBlock([
+      "急いで、と小さく合図した。",
+      "看護師Zの指が、ドアに当たった。",
+      "巡回の足音が、こちらへ向き直った。"
+    ]),
+    DOOR_UNLOCK_PATROL_SILENT: textBlock([
+      "何も伝えられなかった。",
+      "看護師Zが迷ったわずかな間に、手応えが消えた。",
+      "向こう側で、鍵が元へ戻る音がした。"
+    ]),
     DOOR_UNLOCK_EARLY_SIGNAL: textBlock([
       "小さく合図した。",
-      "まだ、その時ではなかった。",
+      "看護師Z「……まだ、その時ではありません。」",
+      "巡回の足音は、まだ聞こえていない。",
       "看護師Zが迷った一瞬に、廊下の空気が変わった。"
     ]),
     FOOTWORK_START: textBlock([

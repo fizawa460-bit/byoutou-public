@@ -49,6 +49,15 @@ body.debug-dialogue-viewer #text {
   gap: 12px;
 }
 
+#choices.footwork-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#choices.footwork-grid > button:not(.footwork-direction) {
+  grid-column: 1 / -1;
+}
+
 #achievement-shelf {
   display: grid;
   grid-template-columns: repeat(5, 48px);
@@ -291,4 +300,49 @@ button:disabled:active {
 .dead .footwork-decoy {
   background: rgba(17, 17, 17, 0.94);
   color: #eee;
+}
+
+
+/* DEBUG専用: 病院内から退院していく主人公を見るASCII背景試作。 */
+body.debug-staff-roll {
+  background: #050505;
+  color: #e8e8e8;
+}
+
+body.debug-staff-roll #game {
+  max-width: 720px;
+  padding: 16px 10px 28px;
+}
+
+body.debug-staff-roll #title {
+  margin: 3vh 0 0;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+}
+
+body.debug-staff-roll #text {
+  margin-top: 14px;
+  white-space: normal;
+}
+
+#debug-staff-roll-stage {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 10px 8px;
+  overflow: hidden;
+  border: 1px solid #777;
+  background: #090909;
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.08);
+  color: #eee;
+  font: clamp(8px, 2.65vw, 14px)/1.15 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  white-space: pre;
+  user-select: none;
+}
+
+body.debug-staff-roll #choices {
+  width: min(100%, 420px);
+  margin: 18px auto 0;
 }

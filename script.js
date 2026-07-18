@@ -1,6 +1,6 @@
 const APP_VERSION = "ver0.24";
 const DEBUG = true;
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 const SAVE_KEYS = {
   main: "byoutou.save.main",
   debug: "byoutou.save.debug"
@@ -76,6 +76,16 @@ let saveMode = "main";
 // 1. 基本設定・状態
 // ============================================================
 
+const STORY_CHAPTER = {
+  INITIAL_DAY: "initialDay",
+  SOFT_ROOM: "softRoom",
+  HARD_ROOM: "hardRoom"
+};
+const STORY_CHAPTER_ORDER = [
+  STORY_CHAPTER.INITIAL_DAY,
+  STORY_CHAPTER.SOFT_ROOM,
+  STORY_CHAPTER.HARD_ROOM
+];
 const STORY = {
   INITIAL_DAY: 0,
   SOFT_ROOM: {
@@ -83,12 +93,16 @@ const STORY = {
     LOOP_AWARE: 2,
     NURSE_Z_ROUTE: 3,
     ESCAPE_READY: 4
+  },
+  HARD_ROOM: {
+    START: 0
   }
 };
 
-// storyは章や物語の大きな進行だけを持つ。
-// 細かいイベント既読はflags側で管理する。
+// storyは現在の章と、その章の大きな進行だけを持つ。
+// 細かいイベント既読はflags、章内の一時状態は章・イベントStateで管理する。
 const story = {
+  chapter: STORY_CHAPTER.INITIAL_DAY,
   progress: STORY.INITIAL_DAY
 };
 
@@ -175,6 +189,8 @@ let footworkCueEndTimer = null;
 // タイトル画面で表示待ちのルール/実績ポップアップ。
 let pendingRulePopups = [];
 let rulePopupTimer = null;
+let rulePopupNextTimer = null;
+let rulePopupActive = false;
 
 // デバッグ用の一つ前へ戻る履歴。
 // 画面表示と主要フラグをまとめて戻す。通常プレイ用のセーブではない。
@@ -284,6 +300,7 @@ function createSaveData() {
   return {
     version: SAVE_VERSION,
     story: {
+      chapter: story.chapter,
       progress: story.progress
     },
     flags: {
@@ -313,7 +330,10 @@ function createSaveData() {
 function getDefaultSaveData() {
   return {
     version: SAVE_VERSION,
-    story: { progress: STORY.INITIAL_DAY },
+    story: {
+      chapter: STORY_CHAPTER.INITIAL_DAY,
+      progress: STORY.INITIAL_DAY
+    },
     flags: {
       nameRegistered: false,
       metNurseZOnPatrol: false,
@@ -343,6 +363,13 @@ function normalizeSaveData(data) {
   const defaults = getDefaultSaveData();
   const nonNegativeInteger = value =>
     Number.isInteger(value) && value >= 0 ? value : 0;
+  const normalizedProgress = nonNegativeInteger(data.story?.progress);
+  const validStoryChapters = Object.values(STORY_CHAPTER);
+  const normalizedChapter = validStoryChapters.includes(data.story?.chapter)
+    ? data.story.chapter
+    : normalizedProgress > STORY.INITIAL_DAY
+      ? STORY_CHAPTER.SOFT_ROOM
+      : STORY_CHAPTER.INITIAL_DAY;
   const normalizedDeathCauseCounts =
     data.deathCauseCounts && typeof data.deathCauseCounts === "object"
       ? Object.fromEntries(
@@ -361,7 +388,8 @@ function normalizeSaveData(data) {
   return {
     version: SAVE_VERSION,
     story: {
-      progress: nonNegativeInteger(data.story?.progress)
+      chapter: normalizedChapter,
+      progress: normalizedProgress
     },
     flags: {
       nameRegistered: data.flags?.nameRegistered === true,
@@ -406,6 +434,7 @@ function applySaveData(data) {
   const normalized = normalizeSaveData(data);
   if (!normalized) return false;
 
+  story.chapter = normalized.story.chapter;
   story.progress = normalized.story.progress;
   flags.nameRegistered = normalized.flags.nameRegistered;
   flags.metNurseZOnPatrol = normalized.flags.metNurseZOnPatrol;
@@ -494,7 +523,7 @@ function formatSaveSlot(slot, label) {
   if (result.status === "error") return `${label}: 読込エラー`;
   const data = result.data;
   return [
-    `${label}: progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
+    `${label}: chapter=${data.story.chapter} progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
     `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint} footworkUnlocks=${Number(data.flags.footworkJumpUnlocked)}${Number(data.flags.footworkPaymentUnlocked)}${Number(data.flags.footworkDonationUnlocked)}`,
     `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
     `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
@@ -514,16 +543,35 @@ function refreshSaveInspector() {
 }
 
 
-function advanceStoryProgress(nextProgress) {
-  story.progress = Math.max(story.progress, nextProgress);
+function getStoryChapterRank(chapter) {
+  return STORY_CHAPTER_ORDER.indexOf(chapter);
 }
 
-function isStoryProgressAtLeast(progress) {
-  return story.progress >= progress;
+function advanceStoryProgress(nextProgress, chapter = STORY_CHAPTER.SOFT_ROOM) {
+  const currentRank = getStoryChapterRank(story.chapter);
+  const nextRank = getStoryChapterRank(chapter);
+  if (nextRank < 0) {
+    throw new Error(`Unknown story chapter: ${chapter}`);
+  }
+  if (nextRank > currentRank) {
+    story.chapter = chapter;
+    story.progress = nextProgress;
+    return;
+  }
+  if (nextRank === currentRank) {
+    story.progress = Math.max(story.progress, nextProgress);
+  }
+}
+
+function isStoryProgressAtLeast(progress, chapter = STORY_CHAPTER.SOFT_ROOM) {
+  const currentRank = getStoryChapterRank(story.chapter);
+  const targetRank = getStoryChapterRank(chapter);
+  return currentRank > targetRank ||
+    (currentRank === targetRank && story.progress >= progress);
 }
 
 function getStoryProgressLabel() {
-  return story.progress;
+  return `${story.chapter}:${story.progress}`;
 }
 
 // messageを1文字ずつ表示する。
@@ -595,10 +643,17 @@ function formatText(message) {
 // itemsには { label: "表示する文", action: 押したときの処理 } を入れる。
 function setChoices(items) {
   choices.innerHTML = "";
+  choices.classList.toggle(
+    "footwork-grid",
+    items.some(item => item.className === "footwork-direction")
+  );
   currentChoiceItems = items;
   items.forEach(item => {
     const button = document.createElement("button");
     button.textContent = item.label;
+    if (item.className) {
+      button.classList.add(item.className);
+    }
     if (item.holdAction) {
       let holdTimer = null;
       let holdTriggered = false;
@@ -668,7 +723,7 @@ function runChoiceAction(item, button) {
 
 function getDebugStateSnapshot() {
   return {
-    storyProgress: story.progress,
+    story: { ...story },
     flags: { ...flags },
     counters: { ...counters },
     deathCauseCounts: { ...deathCauseCounts },
@@ -684,7 +739,15 @@ function getDebugStateSnapshot() {
 }
 
 function restoreDebugStateSnapshot(state) {
-  story.progress = state.storyProgress;
+  if (state.story) {
+    story.chapter = state.story.chapter;
+    story.progress = state.story.progress;
+  } else {
+    story.chapter = state.storyProgress > STORY.INITIAL_DAY
+      ? STORY_CHAPTER.SOFT_ROOM
+      : STORY_CHAPTER.INITIAL_DAY;
+    story.progress = state.storyProgress;
+  }
   Object.assign(flags, state.flags);
   Object.assign(counters, state.counters);
   Object.keys(deathCauseCounts).forEach(id => delete deathCauseCounts[id]);
@@ -887,6 +950,12 @@ function showDebugMenu() {
     { label: "足運びイベント", action: showFootworkEvent },
     { label: "車イベント", action: showCarEvent },
     { label: "第一部完", action: showSoftRoomAfterFin },
+    {
+      label: "スタッフロール背景（仮）",
+      action: showDebugStaffRoll,
+      noHistory: true,
+      advancesTime: false
+    },
     { label: "デバッグセーブを読込", action: loadDebugSaveFromMenu, noHistory: true },
     { label: "デバッグセーブを削除", action: deleteDebugSaveFromMenu, noHistory: true },
     {
@@ -950,7 +1019,7 @@ function getTitleText() {
 }
 
 function startGame() {
-  if (story.progress === STORY.INITIAL_DAY) {
+  if (story.chapter === STORY_CHAPTER.INITIAL_DAY) {
     if (!flags.nameRegistered) {
       showNameInput();
       return;
@@ -968,7 +1037,6 @@ function startGame() {
 
 function showNameInput() {
   document.body.className = "";
-  hideRulePopup();
   contentWarning.hidden = true;
   if (saveInspector) saveInspector.hidden = true;
   title.textContent = "";
@@ -1310,7 +1378,7 @@ const SCENES = {
   "soft.cleaningResult": () => {
     counters.cleanings++;
     typeText(
-      TEXT.SOFT_ROOM.CLEANING_RESULT,
+      TEXT.SOFT_ROOM.CLEANING_RESULT(counters.cleanings),
       () => {
         setChoices([
           { label: TEXT.CHOICE.CLEAN_MORE, action: () => goScene("soft.cleaningResult") },
@@ -1505,10 +1573,10 @@ const SCENES = {
     const expected = footworkRoute[footwork.step];
     const progress = `${footwork.step}/${footworkRoute.length}`;
     const footworkChoices = [
-      { label: TEXT.CHOICE.LEFT_FORWARD, action: () => goScene("footwork.input", { input: "1" }) },
-      { label: TEXT.CHOICE.RIGHT_FORWARD, action: () => goScene("footwork.input", { input: "2" }) },
-      { label: TEXT.CHOICE.LEFT_BACK, action: () => goScene("footwork.input", { input: "3" }) },
-      { label: TEXT.CHOICE.RIGHT_BACK, action: () => goScene("footwork.input", { input: "4" }) }
+      { label: TEXT.CHOICE.LEFT_FORWARD, className: "footwork-direction", action: () => goScene("footwork.input", { input: "1" }) },
+      { label: TEXT.CHOICE.RIGHT_FORWARD, className: "footwork-direction", action: () => goScene("footwork.input", { input: "2" }) },
+      { label: TEXT.CHOICE.LEFT_BACK, className: "footwork-direction", action: () => goScene("footwork.input", { input: "3" }) },
+      { label: TEXT.CHOICE.RIGHT_BACK, className: "footwork-direction", action: () => goScene("footwork.input", { input: "4" }) }
     ];
     if (expected === "5" && isFootworkSpecialUnlocked(expected)) {
       footworkChoices.push({ label: TEXT.CHOICE.JUMP, action: () => goScene("footwork.input", { input: "5" }) });
@@ -1557,7 +1625,6 @@ const SCENES = {
 // foundがtrueのルールだけ本文を表示し、未発見のものは？？？にする。
 function showRules() {
   document.body.className = "";
-  hideRulePopup();
   title.textContent = "ルール";
   const ruleText = rules
     .map((rule, index) => `${index + 1}. ${rule.found ? rule.text : "？？？"}\n`)
@@ -1615,6 +1682,7 @@ function continueAfterNurseCShortcutHintOnce(nurse, continuation) {
   }
 
   flags.heardNurseCShortcutHint = true;
+  findRule("entranceShortcut");
   typeText(
     TEXT.SOFT_ROOM.NURSE_C_SHORTCUT_HINT,
     () => waitForContinue(continuation)
@@ -2673,8 +2741,10 @@ function unlockAchievement(id) {
 
 // タイトル画面で、発見したルールを実績通知のように表示する。
 function showQueuedRulePopup() {
-  if (!rulePopup || pendingRulePopups.length === 0) return;
+  if (!rulePopup || rulePopupActive || pendingRulePopups.length === 0) return;
+  rulePopupActive = true;
   clearTimeout(rulePopupTimer);
+  clearTimeout(rulePopupNextTimer);
   rulePopup.classList.remove("show");
   const popup = pendingRulePopups.shift();
   const popupLabel = typeof popup === "string" ? "ルールが記載されました" : popup.label;
@@ -2682,21 +2752,25 @@ function showQueuedRulePopup() {
   rulePopup.innerHTML =
     `<span class="popup-label">${popupLabel}</span>` +
     `<span class="popup-text">${popupText}</span>`;
-  setTimeout(() => {
+  rulePopupNextTimer = setTimeout(() => {
     rulePopup.classList.add("show");
   }, 150);
   rulePopupTimer = setTimeout(() => {
     rulePopup.classList.remove("show");
-    setTimeout(() => {
+    rulePopupNextTimer = setTimeout(() => {
+      rulePopupActive = false;
       showQueuedRulePopup();
     }, 650);
   }, 3300);
 }
 
-// タイトル以外の画面へ移るとき、表示中のルール通知を消す。
+// デバッグ操作など、通知列を明示的に停止したい場合だけ使用する。
+// 通常の本編・ルール画面への遷移では止めず、タイトルで始まった表示を継続する。
 function hideRulePopup() {
   if (!rulePopup) return;
   clearTimeout(rulePopupTimer);
+  clearTimeout(rulePopupNextTimer);
+  rulePopupActive = false;
   rulePopup.classList.remove("show");
 }
 
@@ -2705,7 +2779,9 @@ function hideRulePopup() {
 function nextLoop() {
   counters.deaths++;
   counters.nurseZDoorTalks = 0;
-  story.progress = Math.min(story.progress, STORY.SOFT_ROOM.NURSE_Z_ROUTE);
+  if (story.chapter === STORY_CHAPTER.SOFT_ROOM) {
+    story.progress = Math.min(story.progress, STORY.SOFT_ROOM.NURSE_Z_ROUTE);
+  }
   resetDailySceneState();
   startTitle();
 }
