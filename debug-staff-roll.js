@@ -19,6 +19,16 @@ function putDebugStaffRollText(grid, row, column, value) {
   });
 }
 
+function drawDebugStaffRollTree(grid, baseRow, centerColumn, size = 1) {
+  const crowns = size === 2
+    ? ["  /\\  ", " /  \\ ", "/_.._\\", "  ||  "]
+    : [" /\\ ", "/  \\", " || "];
+  const topRow = baseRow - crowns.length + 1;
+  crowns.forEach((line, index) => {
+    putDebugStaffRollText(grid, topRow + index, centerColumn - Math.floor(line.length / 2), line);
+  });
+}
+
 function getDebugStaffRollSegmentDistance(px, py, ax, ay, bx, by) {
   const dx = bx - ax;
   const dy = by - ay;
@@ -33,13 +43,13 @@ function getDebugStaffRollSegmentDistance(px, py, ax, ay, bx, by) {
 
 function getDebugStaffRollPersonCharacter(x, y, progress, center) {
   const walkingProgress = Math.min(progress / 0.93, 1);
-  const eased = 1 - Math.pow(1 - walkingProgress, 1.35);
+  const eased = 1 - Math.pow(1 - walkingProgress, 1.15);
   const personHeight = 60 + (5.5 - 60) * eased;
   const scale = personHeight / 40;
   const top = 1 + 8 * eased;
   const seconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
-  const gait = Math.sin(seconds * Math.PI * 3.2);
-  const bodySway = Math.sin(seconds * Math.PI * 3.2 + Math.PI / 2);
+  const gait = Math.sin(seconds * Math.PI * 2.2);
+  const bodySway = Math.sin(seconds * Math.PI * 2.2 + Math.PI / 2);
   const personCenter = center + bodySway * scale * 0.12;
   const px = (x - personCenter) / scale;
   const py = (y - top) / scale;
@@ -140,9 +150,13 @@ function createDebugStaffRollFrame(progress) {
   }
   putDebugStaffRollText(grid, height - 1, 0, "+" + "-".repeat(width - 2) + "+");
 
-  // 屋外の一本道。人物より先に描き、人物をその上へ重ねる。
+  // 屋外の一本道と、街路の左右にある少数の木。人物より先に描く。
   const horizon = 11;
   putDebugStaffRollText(grid, horizon - 1, 3, "##########                                 ##########");
+  drawDebugStaffRollTree(grid, horizon, 8, 1);
+  drawDebugStaffRollTree(grid, horizon, 15, 2);
+  drawDebugStaffRollTree(grid, horizon, width - 16, 2);
+  drawDebugStaffRollTree(grid, horizon, width - 9, 1);
   for (let y = horizon; y < height - 1; y++) {
     const distance = y - horizon;
     const spread = Math.min(24, 1 + Math.floor(distance * 0.95));
@@ -232,9 +246,18 @@ function showDebugStaffRoll() {
     // 扉が閉じ切った後も、病院内から見送るカメラだけがごく小さく揺れ続ける。
     // 文字単位ではなくサブピクセルで動かし、扉の向こうを再表示しない。
     const closedProgress = Math.max(0, Math.min(1, (progress - 0.8) / 0.2));
-    const cameraX = Math.sin(closedProgress * Math.PI * 4.6) * 0.9 * closedProgress;
-    const cameraY = Math.sin(closedProgress * Math.PI * 3.2) * 0.55 * closedProgress;
-    const cameraScale = 1 + closedProgress * 0.0015;
+    // 閉鎖直後の約1秒だけ、扉が閉じた衝撃でカメラが一度強く動く。
+    const impactProgress = Math.min(1, closedProgress / 0.18);
+    const impact = closedProgress > 0 && closedProgress < 0.18
+      ? Math.sin(impactProgress * Math.PI)
+      : 0;
+    const cameraX =
+      Math.sin(closedProgress * Math.PI * 4.6) * 0.9 * closedProgress -
+      impact * 3.8;
+    const cameraY =
+      Math.sin(closedProgress * Math.PI * 3.2) * 0.55 * closedProgress +
+      impact * 2.4;
+    const cameraScale = 1 + closedProgress * 0.0015 + impact * 0.002;
     stage.style.transform =
       `translate3d(${cameraX.toFixed(2)}px, ${cameraY.toFixed(2)}px, 0) scale(${cameraScale.toFixed(4)})`;
 

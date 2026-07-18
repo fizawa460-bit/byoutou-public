@@ -594,10 +594,21 @@ function clearTextSkip() {
   text.classList.remove("is-skippable");
 }
 
+function scrollStoryPageToTop() {
+  const reset = () => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+  reset();
+  requestAnimationFrame(reset);
+}
+
 function typeText(message, callback) {
   clearInterval(typingTimer);
   clearTextSkip();
   text.textContent = "";
+  scrollStoryPageToTop();
   choices.innerHTML = "";
   contentWarning.hidden = true;
   if (saveInspector) saveInspector.hidden = true;
