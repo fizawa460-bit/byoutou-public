@@ -336,7 +336,7 @@ body.debug-staff-roll #text {
   background: #090909;
   box-shadow: 0 0 28px rgba(255, 255, 255, 0.08);
   color: #eee;
-  font: clamp(7px, 2.15vw, 13px)/1.08 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: clamp(4.5px, 1.45vw, 8px)/1.05 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0;
   white-space: pre;
   user-select: none;
