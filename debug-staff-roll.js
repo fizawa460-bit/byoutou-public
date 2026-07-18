@@ -223,6 +223,11 @@ function showDebugStaffRoll() {
   const stage = document.createElement("pre");
   stage.id = "debug-staff-roll-stage";
   stage.setAttribute("aria-label", "病院内から遠ざかる主人公のASCIIアニメーション");
+
+  // 表示枠は固定し、その内側の文字レイヤーだけをカメラとして動かす。
+  const cameraLayer = document.createElement("span");
+  cameraLayer.id = "debug-staff-roll-camera";
+  stage.appendChild(cameraLayer);
   text.appendChild(stage);
 
   setChoices([
@@ -241,7 +246,7 @@ function showDebugStaffRoll() {
   const startedAt = performance.now();
   const renderFrame = now => {
     const progress = Math.min(1, (now - startedAt) / DEBUG_STAFF_ROLL_DURATION_MS);
-    stage.textContent = createDebugStaffRollFrame(progress);
+    cameraLayer.textContent = createDebugStaffRollFrame(progress);
 
     // 扉が閉じ切った後も、病院内から見送るカメラだけがごく小さく揺れ続ける。
     // 文字単位ではなくサブピクセルで動かし、扉の向こうを再表示しない。
@@ -258,7 +263,7 @@ function showDebugStaffRoll() {
       Math.sin(closedProgress * Math.PI * 3.2) * 0.55 * closedProgress +
       impact * 2.4;
     const cameraScale = 1 + closedProgress * 0.0015 + impact * 0.002;
-    stage.style.transform =
+    cameraLayer.style.transform =
       `translate3d(${cameraX.toFixed(2)}px, ${cameraY.toFixed(2)}px, 0) scale(${cameraScale.toFixed(4)})`;
 
     if (progress < 1) {
