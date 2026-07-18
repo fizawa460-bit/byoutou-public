@@ -1,5 +1,5 @@
 // DEBUG専用: 病院内から退院していく主人公を見る、約30秒のASCII背景試作。
-const DEBUG_STAFF_ROLL_DURATION_MS = 30000;
+const DEBUG_STAFF_ROLL_DURATION_MS = 36000;
 let debugStaffRollAnimationFrame = null;
 
 function stopDebugStaffRoll() {
@@ -42,27 +42,57 @@ function getDebugStaffRollSegmentDistance(px, py, ax, ay, bx, by) {
 }
 
 function getDebugStaffRollPersonCharacter(x, y, progress, center) {
-  const walkingProgress = Math.min(progress / 0.93, 1);
+  const seconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
+
+  // 11〜19秒は距離と歩行周期を止め、振り返りだけを行う。
+  const journeyProgress = seconds <= 11
+    ? (seconds / 11) * 0.42
+    : seconds <= 19
+      ? 0.42
+      : 0.42 + Math.min(1, (seconds - 19) / 11) * 0.58;
+  const gaitSeconds = seconds <= 11 ? seconds : seconds <= 19 ? 11 : 11 + (seconds - 19);
+  const turnAmount = seconds < 13
+    ? 0
+    : seconds < 15
+      ? (seconds - 13) / 2
+      : seconds < 17
+        ? 1
+        : seconds < 19
+          ? 1 - (seconds - 17) / 2
+          : 0;
+
+  const walkingProgress = Math.min(journeyProgress, 1);
   const eased = 1 - Math.pow(1 - walkingProgress, 1.15);
   const personHeight = 60 + (5.5 - 60) * eased;
   const scale = personHeight / 40;
   const top = 1 + 8 * eased;
-  const seconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
-  const gait = Math.sin(seconds * Math.PI * 2.2);
-  const bodySway = Math.sin(seconds * Math.PI * 2.2 + Math.PI / 2);
+  const gait = Math.sin(gaitSeconds * Math.PI * 2.2);
+  const bodySway = Math.sin(gaitSeconds * Math.PI * 2.2 + Math.PI / 2);
   const personCenter = center + bodySway * scale * 0.12;
   const px = (x - personCenter) / scale;
   const py = (y - top) / scale;
   const outlineThickness = Math.max(0.36, 0.7 / Math.max(scale, 0.45));
 
   // 輪郭を中心に描き、顔・服の内側は空白として残す。
-  const headValue = (px / 4.25) ** 2 + ((py - 5) / 5.1) ** 2;
+  const headPx = px - turnAmount * 0.7;
+  const headWidth = 4.25 - turnAmount * 0.65;
+  const headValue = (headPx / headWidth) ** 2 + ((py - 5) / 5.1) ** 2;
+
+  // 肩越しに振り返った間だけ、右側へごく短い鼻先を出す。
+  if (
+    turnAmount > 0.45 &&
+    py >= 4.6 && py <= 6.1 &&
+    headPx >= headWidth - 0.15 &&
+    headPx <= headWidth + turnAmount * 1.25
+  ) {
+    return py < 5.25 ? "_" : ">";
+  }
   if (Math.abs(headValue - 1) <= outlineThickness * 0.28) {
     return py < 6.4 ? "@" : "#";
   }
   // 後頭部には輪郭を崩さない程度の、まばらな髪の線だけを置く。
   if (headValue < 0.82 && py < 5.8) {
-    const hairPattern = Math.abs(Math.round(px * 2 + py * 3)) % 7;
+    const hairPattern = Math.abs(Math.round(headPx * 2 + py * 3)) % 7;
     if (hairPattern === 0) return ".";
   }
   if (headValue < 1) return " ";
@@ -73,17 +103,19 @@ function getDebugStaffRollPersonCharacter(x, y, progress, center) {
 
   // 肩と胴体。中央は塗らず、外周とわずかな服のしわだけにする。
   if (py >= 11.8 && py <= 25.7) {
+    const torsoOffset = turnAmount * (py < 17 ? 0.85 : 0.25);
+    const torsoPx = px - torsoOffset;
     const halfWidth = 8.35 - (py - 11.8) * 0.2;
-    if (Math.abs(Math.abs(px) - halfWidth) <= outlineThickness) {
-      return px < 0 ? "/" : "\\";
+    if (Math.abs(Math.abs(torsoPx) - halfWidth) <= outlineThickness) {
+      return torsoPx < 0 ? "/" : "\\";
     }
-    if (py < 13.2 && Math.abs(Math.abs(px) - 5.2) <= outlineThickness) {
+    if (py < 13.2 && Math.abs(Math.abs(torsoPx) - 5.2) <= outlineThickness) {
       return "_";
     }
     if (Math.abs(px) < 0.45 && py > 17 && py < 23 && Math.round(py) % 4 === 0) {
       return ".";
     }
-    if (Math.abs(px) < halfWidth) return " ";
+    if (Math.abs(torsoPx) < halfWidth) return " ";
   }
 
   // 腕は横へ振らず、片方を長く濃く、もう片方を短く薄くして前後運動を表す。
@@ -172,8 +204,9 @@ function createDebugStaffRollFrame(progress) {
     }
   }
 
-  // 20秒ごろから閉まり始め、24秒で人物と外景を完全に隠す。
-  const closingProgress = Math.max(0, Math.min(1, (progress - 0.67) / 0.13));
+  // 26秒から閉まり始め、30秒で人物と外景を完全に隠す。
+  const seconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
+  const closingProgress = Math.max(0, Math.min(1, (seconds - 26) / 4));
   if (closingProgress > 0) {
     const leftPanel = 3 + Math.round((center - 4) * closingProgress);
     const rightPanel = width - 4 - Math.round((center - 4) * closingProgress);
@@ -204,6 +237,32 @@ function createDebugStaffRollFrame(progress) {
   return grid.map(row => row.join("")).join("\n");
 }
 
+
+function getDebugStaffRollCredit(seconds) {
+  if (seconds < 3) {
+    return { text: "作者53", opacity: seconds / 3 };
+  }
+  if (seconds < 13) {
+    return { text: "作者53", opacity: 1 };
+  }
+  if (seconds < 16) {
+    return { text: "作者53", opacity: (16 - seconds) / 3 };
+  }
+  if (seconds < 18) {
+    return { text: "", opacity: 0 };
+  }
+  if (seconds < 21) {
+    return { text: "Special thank you: chatGPT", opacity: (seconds - 18) / 3 };
+  }
+  if (seconds < 31) {
+    return { text: "Special thank you: chatGPT", opacity: 1 };
+  }
+  if (seconds < 34) {
+    return { text: "Special thank you: chatGPT", opacity: (34 - seconds) / 3 };
+  }
+  return { text: "FIN", opacity: Math.min(1, (seconds - 34) / 2) };
+}
+
 function showDebugStaffRoll() {
   stopDebugStaffRoll();
   clearInterval(typingTimer);
@@ -230,6 +289,11 @@ function showDebugStaffRoll() {
   stage.appendChild(cameraLayer);
   text.appendChild(stage);
 
+  const credit = document.createElement("div");
+  credit.id = "debug-staff-roll-credit";
+  credit.setAttribute("aria-live", "polite");
+  text.appendChild(credit);
+
   setChoices([
     { label: "もう一度見る", action: showDebugStaffRoll, noHistory: true, advancesTime: false },
     {
@@ -246,11 +310,15 @@ function showDebugStaffRoll() {
   const startedAt = performance.now();
   const renderFrame = now => {
     const progress = Math.min(1, (now - startedAt) / DEBUG_STAFF_ROLL_DURATION_MS);
+    const elapsedSeconds = progress * DEBUG_STAFF_ROLL_DURATION_MS / 1000;
     cameraLayer.textContent = createDebugStaffRollFrame(progress);
+    const creditState = getDebugStaffRollCredit(elapsedSeconds);
+    credit.textContent = creditState.text;
+    credit.style.opacity = String(creditState.opacity);
 
     // 扉が閉じ切った後も、病院内から見送るカメラだけがごく小さく揺れ続ける。
     // 文字単位ではなくサブピクセルで動かし、扉の向こうを再表示しない。
-    const closedProgress = Math.max(0, Math.min(1, (progress - 0.8) / 0.2));
+    const closedProgress = Math.max(0, Math.min(1, (elapsedSeconds - 30) / 6));
     // 閉鎖直後の約1秒だけ、扉が閉じた衝撃でカメラが一度強く動く。
     const impactProgress = Math.min(1, closedProgress / 0.18);
     const impact = closedProgress > 0 && closedProgress < 0.18
