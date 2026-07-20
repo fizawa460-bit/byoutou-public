@@ -363,3 +363,62 @@ body.debug-staff-roll #choices {
   width: min(100%, 420px);
   margin: 18px auto 0;
 }
+
+
+/* DEBUG専用: 裏世界の簡易戦争プロトタイプ。 */
+body.debug-war {
+  background: #05070b;
+  color: #eee;
+}
+
+body.debug-war #game {
+  max-width: 720px;
+  padding: 18px 12px 30px;
+}
+
+body.debug-war #title {
+  margin: 3vh 0 0;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+}
+
+body.debug-war #text {
+  margin-top: 18px;
+  white-space: normal;
+}
+
+#debug-war-battlefield {
+  overflow: hidden;
+  border: 1px solid #3c4350;
+  border-radius: 8px;
+  background: #080b12;
+  box-shadow: 0 0 28px rgba(65, 112, 180, 0.12);
+}
+
+#debug-war-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #080b12;
+}
+
+#debug-war-report {
+  min-height: 3.2em;
+  padding: 10px 12px;
+  border-top: 1px solid #252b35;
+  color: #dfe5ee;
+  font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: center;
+}
+
+body.debug-war #choices {
+  width: min(100%, 420px);
+  margin: 18px auto 0;
+}
+
+body.debug-war button {
+  background: #10141c;
+  color: #eee;
+  border-color: #3c4350;
+}

@@ -962,6 +962,12 @@ function showDebugMenu() {
     { label: "車イベント", action: showCarEvent },
     { label: "第一部完", action: showSoftRoomAfterFin },
     {
+      label: "裏世界・戦争（仮）",
+      action: showDebugWarPrototype,
+      noHistory: true,
+      advancesTime: false
+    },
+    {
       label: "スタッフロール背景（仮）",
       action: showDebugStaffRoll,
       noHistory: true,
