@@ -65,6 +65,7 @@
   let history = [];
   let future = [];
   let showGrid = true;
+  let visibleLayers = new Set(LAYERS);
 
   buildPalette();
   bindControls();
@@ -102,6 +103,10 @@
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
+    $("layer-select").addEventListener("change", (event) => { showLayer(event.target.value); setStatus(`${layerName(event.target.value)}を編集中`); });
+    $("show-all-layers").addEventListener("click", showAllLayers);
+    $("show-only-active").addEventListener("click", showOnlyActiveLayer);
+    document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
     $("load-sample").addEventListener("click", () => replaceMap(sample, "見本を復元しました"));
     $("new-map").addEventListener("click", newMap);
     $("resize-map").addEventListener("click", resizeMap);
@@ -120,6 +125,7 @@
     selectedTile = id;
     setMode("paint");
     $("layer-select").value = tiles[id].layer;
+    showLayer(tiles[id].layer);
     document.querySelectorAll(".tile-button").forEach((button) => button.classList.toggle("active", button.dataset.tile === id));
     setStatus(`${tiles[id].name}を選択中`);
   }
@@ -137,6 +143,8 @@
     const x = Math.floor(((event.clientX - rect.left) * scaleX) / CELL);
     const y = Math.floor(((event.clientY - rect.top) * scaleY) / CELL);
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
+    const activeLayer = $("layer-select").value;
+    if (mode !== "pick" && !visibleLayers.has(activeLayer)) return setStatus(`${layerName(activeLayer)}は非表示のため編集できません`);
     if (start) remember();
     if (mode === "pick") return pickAt(x, y);
     if (mode === "erase") removeAt(x, y, $("layer-select").value);
@@ -160,7 +168,7 @@
   }
 
   function pickAt(x, y) {
-    for (const layer of [...LAYERS].reverse()) {
+    for (const layer of [...LAYERS].reverse().filter((id) => visibleLayers.has(id))) {
       const found = [...map.placements].reverse().find((p) => p.layer === layer && contains(p, x, y));
       if (found) { selectTile(found.tile); return; }
     }
@@ -183,7 +191,7 @@
     target.clearRect(0, 0, canvas.width, canvas.height);
     target.fillStyle = "#141414";
     target.fillRect(0, 0, canvas.width, canvas.height);
-    LAYERS.forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => {
+    LAYERS.filter((layer) => visibleLayers.has(layer)).forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => {
       const tile = tiles[p.tile];
       if (tile) tile.draw(target, p.x * CELL, p.y * CELL, tile.w * CELL, tile.h * CELL, false);
     }));
@@ -197,6 +205,45 @@
     for (let x = 0; x <= map.width; x++) { target.beginPath(); target.moveTo(x * CELL + .5, 0); target.lineTo(x * CELL + .5, canvas.height); target.stroke(); }
     for (let y = 0; y <= map.height; y++) { target.beginPath(); target.moveTo(0, y * CELL + .5); target.lineTo(canvas.width, y * CELL + .5); target.stroke(); }
     target.restore();
+  }
+
+  function layerName(layer) {
+    return ({ floor: "床", structure: "壁・構造", fixture: "設備", overlay: "装飾・影" })[layer] || layer;
+  }
+  function showLayer(layer) {
+    if (!visibleLayers.has(layer)) visibleLayers.add(layer);
+    syncLayerButtons();
+    render();
+  }
+  function showAllLayers() {
+    visibleLayers = new Set(LAYERS);
+    syncLayerButtons();
+    render();
+    setStatus("全レイヤーを重ねて表示中");
+  }
+  function showOnlyActiveLayer() {
+    const active = $("layer-select").value;
+    visibleLayers = new Set([active]);
+    syncLayerButtons();
+    render();
+    setStatus(`${layerName(active)}のみ表示中`);
+  }
+  function toggleLayer(layer) {
+    if (visibleLayers.has(layer)) visibleLayers.delete(layer); else visibleLayers.add(layer);
+    syncLayerButtons();
+    render();
+    setStatus(`${layerName(layer)}を${visibleLayers.has(layer) ? "表示" : "非表示"}にしました`);
+  }
+  function syncLayerButtons() {
+    document.querySelectorAll(".layer-eye").forEach((button) => {
+      const shown = visibleLayers.has(button.dataset.layer);
+      button.classList.toggle("active", shown);
+      button.setAttribute("aria-pressed", String(shown));
+      button.textContent = `${shown ? "◉" : "○"} ${layerName(button.dataset.layer).replace("・構造", "").replace("・影", "")}`;
+    });
+    $("show-all-layers").classList.toggle("active", visibleLayers.size === LAYERS.length);
+    const active = $("layer-select").value;
+    $("show-only-active").classList.toggle("active", visibleLayers.size === 1 && visibleLayers.has(active));
   }
 
   function remember() { history.push(clone(map)); if (history.length > 50) history.shift(); future = []; }
@@ -249,7 +296,7 @@
   function exportPng() {
     const output = document.createElement("canvas"); output.width = map.width * CELL; output.height = map.height * CELL;
     const out = output.getContext("2d"); out.fillStyle = "#141414"; out.fillRect(0, 0, output.width, output.height);
-    LAYERS.forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => { const tile = tiles[p.tile]; tile.draw(out, p.x * CELL, p.y * CELL, tile.w * CELL, tile.h * CELL, false); }));
+    LAYERS.filter((layer) => visibleLayers.has(layer)).forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => { const tile = tiles[p.tile]; tile.draw(out, p.x * CELL, p.y * CELL, tile.w * CELL, tile.h * CELL, false); }));
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
   }
   function download(blob, filename) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>病棟マップエディタ</title>
-  <link rel="stylesheet" href="style.css?v=20260723-1">
+  <link rel="stylesheet" href="style.css?v=20260723-2">
 </head>
 <body>
   <header class="app-header">
@@ -40,6 +40,15 @@
         <button id="undo" type="button" title="元に戻す">↶</button>
         <button id="redo" type="button" title="やり直す">↷</button>
         <label class="grid-toggle"><input id="show-grid" type="checkbox" checked> グリッド</label>
+        <div class="layer-tools" aria-label="レイヤー表示設定">
+          <span>表示</span>
+          <button id="show-all-layers" type="button" class="active">全体</button>
+          <button id="show-only-active" type="button">編集中のみ</button>
+          <button type="button" class="layer-eye active" data-layer="floor" aria-pressed="true">◉ 床</button>
+          <button type="button" class="layer-eye active" data-layer="structure" aria-pressed="true">◉ 壁</button>
+          <button type="button" class="layer-eye active" data-layer="fixture" aria-pressed="true">◉ 設備</button>
+          <button type="button" class="layer-eye active" data-layer="overlay" aria-pressed="true">◉ 装飾</button>
+        </div>
       </div>
       <div id="canvas-scroll" class="canvas-scroll">
         <canvas id="map-canvas" aria-label="マップ編集領域"></canvas>
@@ -67,6 +76,6 @@
     </aside>
   </main>
 
-  <script src="editor.js?v=20260723-1"></script>
+  <script src="editor.js?v=20260723-2"></script>
 </body>
 </html>
