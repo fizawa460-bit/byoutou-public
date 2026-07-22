@@ -65,6 +65,10 @@ button.primary { color: #17130e; border-color: #d2b57a; background: var(--accent
 .toolbar label, .data-panel label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 .toolbar select { min-height: 40px; padding: 7px; }
 .toolbar .grid-toggle { display: flex; align-items: center; min-height: 40px; }
+.layer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; width: 100%; padding-top: 7px; border-top: 1px solid var(--line); }
+.layer-tools > span { margin-right: 3px; color: var(--muted); font-size: 12px; }
+.layer-tools button { min-height: 34px; padding: 5px 9px; font-size: 12px; }
+.layer-eye:not(.active) { color: #777; border-color: #292b2d; background: #111; text-decoration: line-through; }
 .canvas-scroll { max-height: calc(100vh - 190px); overflow: auto; padding: 18px; text-align: center; background: #090a0b; touch-action: pan-x pan-y; }
 #map-canvas { display: block; margin: auto; max-width: none; background: #171717; box-shadow: 0 16px 40px #000; touch-action: none; }
 .status { min-height: 20px; margin: 0; padding: 7px 12px; border-top: 1px solid #252729; }
@@ -96,4 +100,6 @@ textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 
   .editor-panel { width: 100%; }
   .canvas-scroll { max-height: none; overflow: hidden; padding: 8px; }
   #map-canvas { width: 100%; height: auto; }
+  .layer-tools { gap: 4px; }
+  .layer-tools button { flex: 1 1 auto; padding-inline: 6px; }
 }
