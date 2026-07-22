@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>病棟マップエディタ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">BYOUTOU / MAP TOOL</p>
+      <h1>病棟マップエディタ</h1>
+    </div>
+    <div class="header-actions">
+      <button id="new-map" type="button">新規</button>
+      <button id="load-sample" type="button" class="primary">見本を復元</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel palette-panel">
+      <h2>パレット</h2>
+      <p class="hint">パーツを選び、部屋をタップして配置します。</p>
+      <div id="palette" class="palette" aria-label="タイルパレット"></div>
+    </aside>
+
+    <section class="editor-panel">
+      <div class="toolbar">
+        <label>レイヤー
+          <select id="layer-select">
+            <option value="floor">床</option>
+            <option value="structure">壁・構造</option>
+            <option value="fixture" selected>設備</option>
+            <option value="overlay">装飾・影</option>
+          </select>
+        </label>
+        <button id="eraser" type="button">消しゴム</button>
+        <button id="picker" type="button">スポイト</button>
+        <button id="undo" type="button" title="元に戻す">↶</button>
+        <button id="redo" type="button" title="やり直す">↷</button>
+        <label class="grid-toggle"><input id="show-grid" type="checkbox" checked> グリッド</label>
+      </div>
+      <div id="canvas-scroll" class="canvas-scroll">
+        <canvas id="map-canvas" aria-label="マップ編集領域"></canvas>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <aside class="panel data-panel">
+      <h2>マップデータ</h2>
+      <label>名前<input id="map-name" value="ソフト監禁室・見本"></label>
+      <div class="size-fields">
+        <label>横<input id="map-width" type="number" min="6" max="40" value="12"></label>
+        <label>縦<input id="map-height" type="number" min="6" max="40" value="11"></label>
+        <button id="resize-map" type="button">変更</button>
+      </div>
+      <button id="save-json" type="button">JSON保存</button>
+      <button id="open-json" type="button">JSON読込</button>
+      <button id="export-png" type="button" class="primary">PNG書出し</button>
+      <input id="json-file" type="file" accept="application/json,.json" hidden>
+      <details>
+        <summary>JSONを直接編集</summary>
+        <textarea id="json-text" spellcheck="false"></textarea>
+        <button id="apply-json" type="button">JSONを反映</button>
+      </details>
+    </aside>
+  </main>
+
+  <script src="editor.js"></script>
+</body>
+</html>
