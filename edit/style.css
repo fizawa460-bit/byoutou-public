@@ -93,5 +93,7 @@ textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 
   .data-panel h2, .data-panel details, .data-panel label:first-of-type { grid-column: 1 / -1; }
   .palette { grid-template-columns: repeat(4, 1fr); }
   .tile-button { min-height: 70px; }
-  .canvas-scroll { max-height: 62vh; padding: 10px; }
+  .editor-panel { width: 100%; }
+  .canvas-scroll { max-height: none; overflow: hidden; padding: 8px; }
+  #map-canvas { width: 100%; height: auto; }
 }
