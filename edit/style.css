@@ -65,6 +65,7 @@ button.primary { color: #17130e; border-color: #d2b57a; background: var(--accent
 .toolbar label, .data-panel label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 .toolbar select { min-height: 40px; padding: 7px; }
 .toolbar select:disabled { color: #666; opacity: .65; }
+.toolbar .compact-input { width: 62px; min-height: 40px; padding: 7px; }
 .toolbar .grid-toggle { display: flex; align-items: center; min-height: 40px; }
 .layer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; width: 100%; padding-top: 7px; border-top: 1px solid var(--line); }
 .layer-tools > span { margin-right: 3px; color: var(--muted); font-size: 12px; }
