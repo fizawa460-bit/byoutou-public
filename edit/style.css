@@ -76,8 +76,11 @@ button.primary { color: #17130e; border-color: #d2b57a; background: var(--accent
 
 .data-panel { display: grid; align-content: start; gap: 10px; }
 .data-panel input, .data-panel textarea { width: 100%; padding: 9px; }
-.size-fields { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 6px; }
+.size-fields { display: grid; grid-template-columns: 1fr 1fr 1.2fr auto; align-items: end; gap: 6px; }
 .size-fields input { min-width: 0; }
+.size-fields label { position: relative; }
+.size-fields label span { position: absolute; right: 7px; bottom: 10px; color: #777; pointer-events: none; }
+.size-fields label:has(span) input { padding-right: 27px; }
 details { border-top: 1px solid var(--line); padding-top: 10px; }
 summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 ui-monospace, monospace; }
@@ -96,6 +99,7 @@ textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 
   .editor-panel { order: 1; }
   .data-panel { order: 3; display: grid; grid-template-columns: 1fr 1fr; }
   .data-panel h2, .data-panel details, .data-panel label:first-of-type { grid-column: 1 / -1; }
+  .data-panel .size-fields { grid-column: 1 / -1; }
   .palette { grid-template-columns: repeat(4, 1fr); }
   .tile-button { min-height: 70px; }
   .editor-panel { width: 100%; }

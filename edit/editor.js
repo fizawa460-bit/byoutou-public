@@ -145,8 +145,9 @@
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const x = Math.floor(((event.clientX - rect.left) * scaleX) / CELL);
-    const y = Math.floor(((event.clientY - rect.top) * scaleY) / CELL);
+    const cell = getCellSize();
+    const x = Math.floor(((event.clientX - rect.left) * scaleX) / cell);
+    const y = Math.floor(((event.clientY - rect.top) * scaleY) / cell);
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
     const activeLayer = $("layer-select").value;
     if (mode !== "pick" && !visibleLayers.has(activeLayer)) return setStatus(`${layerName(activeLayer)}は非表示のため編集できません`);
@@ -203,8 +204,9 @@
   }
 
   function render(target = ctx, includeGrid = showGrid) {
-    canvas.width = map.width * CELL;
-    canvas.height = map.height * CELL;
+    const cell = getCellSize();
+    canvas.width = map.width * cell;
+    canvas.height = map.height * cell;
     target.clearRect(0, 0, canvas.width, canvas.height);
     target.fillStyle = "#141414";
     target.fillRect(0, 0, canvas.width, canvas.height);
@@ -218,20 +220,26 @@
     const tile = tiles[placement.tile];
     const size = footprint(placement);
     if (!tile || !size) return;
-    const x = placement.x * CELL;
-    const y = placement.y * CELL;
-    const w = size.w * CELL;
-    const h = size.h * CELL;
-    if (placement.tile === "rail") drawRailRotated(target, x, y, w, h, Number(placement.rotation || 0));
-    else tile.draw(target, x, y, w, h, false);
+    const cell = getCellSize();
+    const x = placement.x * cell;
+    const y = placement.y * cell;
+    const baseWidth = size.w * CELL;
+    const baseHeight = size.h * CELL;
+    target.save();
+    target.translate(x, y);
+    target.scale(cell / CELL, cell / CELL);
+    if (placement.tile === "rail") drawRailRotated(target, 0, 0, baseWidth, baseHeight, Number(placement.rotation || 0));
+    else tile.draw(target, 0, 0, baseWidth, baseHeight, false);
+    target.restore();
   }
 
   function drawGrid(target) {
     target.save();
     target.strokeStyle = "rgba(238,235,222,.13)";
     target.lineWidth = 1;
-    for (let x = 0; x <= map.width; x++) { target.beginPath(); target.moveTo(x * CELL + .5, 0); target.lineTo(x * CELL + .5, canvas.height); target.stroke(); }
-    for (let y = 0; y <= map.height; y++) { target.beginPath(); target.moveTo(0, y * CELL + .5); target.lineTo(canvas.width, y * CELL + .5); target.stroke(); }
+    const cell = getCellSize();
+    for (let x = 0; x <= map.width; x++) { target.beginPath(); target.moveTo(x * cell + .5, 0); target.lineTo(x * cell + .5, canvas.height); target.stroke(); }
+    for (let y = 0; y <= map.height; y++) { target.beginPath(); target.moveTo(0, y * cell + .5); target.lineTo(canvas.width, y * cell + .5); target.stroke(); }
     target.restore();
   }
 
@@ -282,21 +290,24 @@
   function newMap() {
     const width = clamp(Number($("map-width").value), 6, 40);
     const height = clamp(Number($("map-height").value), 6, 40);
+    const cellSize = clamp(Number($("cell-size").value), 16, 128);
     const placements = Array.from({ length: width * height }, (_, i) => ({ tile: "floor", x: i % width, y: Math.floor(i / width), layer: "floor" }));
-    replaceMap({ version: 1, name: "新規マップ", cellSize: CELL, width, height, placements }, "新規マップを作成しました");
+    replaceMap({ version: 1, name: "新規マップ", cellSize, width, height, placements }, "新規マップを作成しました");
   }
   function resizeMap() {
     remember();
     map.width = clamp(Number($("map-width").value), 6, 40);
     map.height = clamp(Number($("map-height").value), 6, 40);
+    map.cellSize = clamp(Number($("cell-size").value), 16, 128);
     map.placements = map.placements.filter((p) => p.x < map.width && p.y < map.height);
-    syncFields(); render(); setStatus("マップサイズを変更しました");
+    syncFields(); render(); setStatus(`マップを${map.width}×${map.height}マス／1マス${map.cellSize}pxに変更しました`);
   }
 
   function syncFields() {
     $("map-name").value = map.name;
     $("map-width").value = map.width;
     $("map-height").value = map.height;
+    $("cell-size").value = getCellSize();
     refreshJson();
   }
   function refreshJson() { $("json-text").value = formatMapJson(map); }
@@ -321,7 +332,7 @@
   }
   function validateMap(value) {
     if (!value || !Number.isInteger(value.width) || !Number.isInteger(value.height) || !Array.isArray(value.placements)) throw new Error("マップ形式が正しくありません");
-    value.width = clamp(value.width, 6, 40); value.height = clamp(value.height, 6, 40); value.cellSize = CELL; value.version = 1;
+    value.width = clamp(value.width, 6, 40); value.height = clamp(value.height, 6, 40); value.cellSize = clamp(Number(value.cellSize || CELL), 16, 128); value.version = 1;
     value.name = String(value.name || "名称未設定");
     value.placements = value.placements.map((p) => {
       if (p.tile === "railH") return { ...p, tile: "rail", rotation: 0 };
@@ -338,7 +349,8 @@
     return value;
   }
   function exportPng() {
-    const output = document.createElement("canvas"); output.width = map.width * CELL; output.height = map.height * CELL;
+    const cell = getCellSize();
+    const output = document.createElement("canvas"); output.width = map.width * cell; output.height = map.height * cell;
     const out = output.getContext("2d"); out.fillStyle = "#141414"; out.fillRect(0, 0, output.width, output.height);
     LAYERS.filter((layer) => visibleLayers.has(layer)).forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => drawPlacement(out, p)));
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
@@ -348,6 +360,7 @@
   function setStatus(text) { $("status").textContent = text; }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(value || min))); }
+  function getCellSize() { return clamp(Number(map.cellSize || CELL), 16, 128); }
 
   function rect(g, x, y, w, h, fill, stroke = null, line = 1) { g.fillStyle = fill; g.fillRect(x, y, w, h); if (stroke) { g.strokeStyle = stroke; g.lineWidth = line; g.strokeRect(x + line / 2, y + line / 2, w - line, h - line); } }
   function drawFloor(g, x, y, w, h) { rect(g, x, y, w, h, "#77736b", "#59564f", 2); g.fillStyle = "rgba(255,255,255,.035)"; for (let i = 0; i < 8; i++) g.fillRect(x + (i * 19 + y) % w, y + (i * 31 + x) % h, 2, 2); }
