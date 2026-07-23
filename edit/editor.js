@@ -66,6 +66,8 @@
   let showGrid = true;
   let visibleLayers = new Set(LAYERS);
   let selectedRotation = 0;
+  let selectedWidth = 2;
+  let selectedHeight = 3;
 
   buildPalette();
   bindControls();
@@ -104,7 +106,10 @@
     $("redo").addEventListener("click", redo);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
     $("layer-select").addEventListener("change", (event) => { showLayer(event.target.value); setStatus(`${layerName(event.target.value)}を編集中`); });
-    $("rotation-select").addEventListener("change", (event) => { selectedRotation = Number(event.target.value); setStatus(`レールの向き：${selectedRotation}°`); });
+    $("rotation-select").addEventListener("change", (event) => { selectedRotation = Number(event.target.value); resetSelectedSize(); setStatus(`レールの向き：${selectedRotation}°`); });
+    $("tile-width").addEventListener("change", syncSelectedSize);
+    $("tile-height").addEventListener("change", syncSelectedSize);
+    $("reset-tile-size").addEventListener("click", resetSelectedSize);
     $("show-all-layers").addEventListener("click", showAllLayers);
     $("show-only-active").addEventListener("click", showOnlyActiveLayer);
     document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
@@ -122,7 +127,7 @@
     });
   }
 
-  function selectTile(id) {
+  function selectTile(id, preserveSize = false) {
     selectedTile = id;
     setMode("paint");
     $("layer-select").value = tiles[id].layer;
@@ -130,9 +135,26 @@
     $("rotation-select").disabled = !canRotate;
     if (!canRotate) selectedRotation = 0;
     $("rotation-select").value = String(selectedRotation);
+    if (!preserveSize) resetSelectedSize();
     showLayer(tiles[id].layer);
     document.querySelectorAll(".tile-button").forEach((button) => button.classList.toggle("active", button.dataset.tile === id));
     setStatus(`${tiles[id].name}を選択中`);
+  }
+
+  function syncSelectedSize() {
+    selectedWidth = clamp(Number($("tile-width").value), 1, 12);
+    selectedHeight = clamp(Number($("tile-height").value), 1, 12);
+    $("tile-width").value = selectedWidth;
+    $("tile-height").value = selectedHeight;
+    setStatus(`配置サイズ：${selectedWidth}×${selectedHeight}マス`);
+  }
+
+  function resetSelectedSize() {
+    const size = defaultFootprint(selectedTile, selectedRotation);
+    selectedWidth = size.w;
+    selectedHeight = size.h;
+    $("tile-width").value = selectedWidth;
+    $("tile-height").value = selectedHeight;
   }
 
   function setMode(next) {
@@ -161,7 +183,9 @@
 
   function placeAt(tileId, x, y) {
     const tile = tiles[tileId];
-    const next = { tile: tileId, x, y, layer: tile.layer, ...(tileId === "rail" ? { rotation: selectedRotation } : {}) };
+    const normal = defaultFootprint(tileId, selectedRotation);
+    const customSize = selectedWidth !== normal.w || selectedHeight !== normal.h;
+    const next = { tile: tileId, x, y, layer: tile.layer, ...(tileId === "rail" ? { rotation: selectedRotation } : {}), ...(customSize ? { width: selectedWidth, height: selectedHeight } : {}) };
     const size = footprint(next);
     if (x + size.w > map.width || y + size.h > map.height) return setStatus("マップの外には配置できません");
     map.placements = map.placements.filter((p) => p.layer !== tile.layer || !overlaps(p, next));
@@ -178,7 +202,15 @@
   function pickAt(x, y) {
     for (const layer of [...LAYERS].reverse().filter((id) => visibleLayers.has(id))) {
       const found = [...map.placements].reverse().find((p) => p.layer === layer && contains(p, x, y));
-      if (found) { selectedRotation = Number(found.rotation || 0); selectTile(found.tile); $("rotation-select").value = String(selectedRotation); return; }
+      if (found) {
+        selectedRotation = Number(found.rotation || 0);
+        const size = footprint(found);
+        selectedWidth = size.w; selectedHeight = size.h;
+        selectTile(found.tile, true);
+        $("rotation-select").value = String(selectedRotation);
+        $("tile-width").value = selectedWidth; $("tile-height").value = selectedHeight;
+        return;
+      }
     }
   }
 
@@ -196,8 +228,14 @@
   function footprint(placement) {
     const tile = tiles[placement.tile];
     if (!tile) return null;
-    if (placement.tile !== "rail") return { w: tile.w, h: tile.h };
-    const rotation = Number(placement.rotation || 0);
+    if (Number.isInteger(placement.width) && Number.isInteger(placement.height)) return { w: clamp(placement.width, 1, 12), h: clamp(placement.height, 1, 12) };
+    return defaultFootprint(placement.tile, Number(placement.rotation || 0));
+  }
+
+  function defaultFootprint(tileId, rotation = 0) {
+    const tile = tiles[tileId];
+    if (!tile) return { w: 1, h: 1 };
+    if (tileId !== "rail") return { w: tile.w, h: tile.h };
     if (rotation === 90) return { w: 1, h: 3 };
     if (rotation === 45 || rotation === 135) return { w: 3, h: 3 };
     return { w: 3, h: 1 };
@@ -340,7 +378,9 @@
       return p;
     }).filter((p) => tiles[p.tile] && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0).map((p) => {
       const rotation = tiles[p.tile].rotations?.includes(Number(p.rotation)) ? Number(p.rotation) : 0;
-      return { tile: p.tile, x: p.x, y: p.y, layer: tiles[p.tile].layer, ...(p.tile === "rail" ? { rotation } : {}) };
+      const normal = defaultFootprint(p.tile, rotation);
+      const hasCustomSize = Number.isInteger(p.width) && Number.isInteger(p.height) && (p.width !== normal.w || p.height !== normal.h);
+      return { tile: p.tile, x: p.x, y: p.y, layer: tiles[p.tile].layer, ...(p.tile === "rail" ? { rotation } : {}), ...(hasCustomSize ? { width: clamp(p.width, 1, 12), height: clamp(p.height, 1, 12) } : {}) };
     });
     if (value.floorFill && !value.placements.some((p) => p.layer === "floor")) {
       value.placements.unshift(...Array.from({ length: value.width * value.height }, (_, i) => ({ tile: "floor", x: i % value.width, y: Math.floor(i / value.width), layer: "floor" })));
