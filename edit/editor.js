@@ -299,8 +299,17 @@
     $("map-height").value = map.height;
     refreshJson();
   }
-  function refreshJson() { $("json-text").value = JSON.stringify(map, null, 2); }
-  function saveJson() { download(new Blob([JSON.stringify(map, null, 2)], { type: "application/json" }), `${safeName(map.name)}.json`); }
+  function refreshJson() { $("json-text").value = formatMapJson(map); }
+  function saveJson() { download(new Blob([formatMapJson(map)], { type: "application/json" }), `${safeName(map.name)}.json`); }
+  function formatMapJson(value) {
+    const { placements, ...meta } = value;
+    const header = JSON.stringify(meta, null, 2).replace(/\n}$/, "");
+    const rows = placements.map((placement, index) => {
+      const fields = Object.entries(placement).map(([key, fieldValue]) => `${JSON.stringify(key)}: ${JSON.stringify(fieldValue)}`).join(", ");
+      return `    { ${fields} }${index < placements.length - 1 ? "," : ""}`;
+    }).join("\n");
+    return `${header},\n  "placements": [\n${rows}\n  ]\n}`;
+  }
   async function loadJsonFile(event) {
     const file = event.target.files[0];
     if (file) importJson(await file.text());
