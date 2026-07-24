@@ -30,6 +30,8 @@ button, select, input, textarea {
 button { min-height: 40px; padding: 8px 12px; cursor: pointer; }
 button:hover, button.active { border-color: var(--accent); background: #2c281f; }
 button.primary { color: #17130e; border-color: #d2b57a; background: var(--accent); font-weight: 700; }
+button.danger { color: #ffb7b7; border-color: #6d3939; background: #281717; }
+button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
 
 .app-header {
   display: flex;
