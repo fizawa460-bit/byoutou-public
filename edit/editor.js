@@ -68,9 +68,11 @@
   let selectedRotation = 0;
   let selectedWidth = 2;
   let selectedHeight = 3;
+  let selectedPlacements = new Set();
 
   buildPalette();
   bindControls();
+  syncSelectionControls();
   syncFields();
   render();
 
@@ -102,6 +104,13 @@
     canvas.addEventListener("pointercancel", () => { dragging = false; });
     $("eraser").addEventListener("click", () => setMode("erase"));
     $("picker").addEventListener("click", () => setMode("pick"));
+    $("select-objects").addEventListener("click", () => setMode("select"));
+    $("select-visible").addEventListener("click", selectVisiblePlacements);
+    $("clear-selection").addEventListener("click", () => clearSelection("選択を解除しました"));
+    $("delete-selection").addEventListener("click", deleteSelectedPlacements);
+    document.querySelectorAll(".move-selection").forEach((button) => button.addEventListener("click", () => {
+      moveSelectedPlacements(Number(button.dataset.dx), Number(button.dataset.dy));
+    }));
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
@@ -124,6 +133,16 @@
     $("export-png").addEventListener("click", exportPng);
     window.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
+      if (mode === "select" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const moves = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+        moveSelectedPlacements(...moves[event.key]);
+      }
+      if (mode === "select" && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault();
+        deleteSelectedPlacements();
+      }
+      if (event.key === "Escape") clearSelection("選択を解除しました");
     });
   }
 
@@ -161,6 +180,9 @@
     mode = next;
     $("eraser").classList.toggle("active", mode === "erase");
     $("picker").classList.toggle("active", mode === "pick");
+    $("select-objects").classList.toggle("active", mode === "select");
+    if (mode !== "select" && selectedPlacements.size) clearSelection();
+    if (mode === "select") setStatus("配置物をタップして複数選択できます");
   }
 
   function applyPointer(event, start) {
@@ -173,6 +195,10 @@
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
     const activeLayer = $("layer-select").value;
     if (mode !== "pick" && !visibleLayers.has(activeLayer)) return setStatus(`${layerName(activeLayer)}は非表示のため編集できません`);
+    if (mode === "select") {
+      if (start) toggleSelectionAt(x, y);
+      return;
+    }
     if (start) remember();
     if (mode === "pick") return pickAt(x, y);
     if (mode === "erase") removeAt(x, y, $("layer-select").value);
@@ -214,6 +240,79 @@
     }
   }
 
+  function findTopPlacementAt(x, y) {
+    for (const layer of [...LAYERS].reverse().filter((id) => visibleLayers.has(id))) {
+      const found = [...map.placements].reverse().find((p) => p.layer === layer && contains(p, x, y));
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function toggleSelectionAt(x, y) {
+    const found = findTopPlacementAt(x, y);
+    if (!found) return setStatus("ここには選択できる配置物がありません");
+    if (selectedPlacements.has(found)) selectedPlacements.delete(found);
+    else selectedPlacements.add(found);
+    syncSelectionControls();
+    render();
+    setStatus(`${selectedPlacements.size}個を選択中`);
+  }
+
+  function selectVisiblePlacements() {
+    setMode("select");
+    const activeLayer = $("layer-select").value;
+    selectedPlacements = new Set(map.placements.filter((p) => p.layer === activeLayer));
+    syncSelectionControls();
+    render();
+    setStatus(`${layerName(activeLayer)}の配置物を${selectedPlacements.size}個選択しました`);
+  }
+
+  function clearSelection(message = "") {
+    selectedPlacements.clear();
+    syncSelectionControls();
+    render();
+    if (message) setStatus(message);
+  }
+
+  function syncSelectionControls() {
+    const count = selectedPlacements.size;
+    $("selection-count").textContent = `選択 ${count}個`;
+    document.querySelectorAll(".move-selection").forEach((button) => { button.disabled = count === 0; });
+    $("clear-selection").disabled = count === 0;
+    $("delete-selection").disabled = count === 0;
+  }
+
+  function moveSelectedPlacements(dx, dy) {
+    if (!selectedPlacements.size) return setStatus("移動する配置物を選択してください");
+    const selected = [...selectedPlacements];
+    const moved = selected.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }));
+    const outside = moved.some((p) => {
+      const size = footprint(p);
+      return p.x < 0 || p.y < 0 || p.x + size.w > map.width || p.y + size.h > map.height;
+    });
+    if (outside) return setStatus("マップの外へは移動できません");
+    const unselected = map.placements.filter((p) => !selectedPlacements.has(p));
+    const collision = moved.some((next) => unselected.some((p) => p.layer === next.layer && overlaps(p, next)));
+    if (collision) return setStatus("同じレイヤーの別パーツと重なるため移動できません");
+    remember();
+    selected.forEach((p) => { p.x += dx; p.y += dy; });
+    render();
+    refreshJson();
+    setStatus(`${selected.length}個を${dx < 0 ? "左" : dx > 0 ? "右" : dy < 0 ? "上" : "下"}へ1マス移動しました`);
+  }
+
+  function deleteSelectedPlacements() {
+    if (!selectedPlacements.size) return setStatus("削除する配置物を選択してください");
+    const count = selectedPlacements.size;
+    remember();
+    map.placements = map.placements.filter((p) => !selectedPlacements.has(p));
+    selectedPlacements.clear();
+    syncSelectionControls();
+    render();
+    refreshJson();
+    setStatus(`${count}個の配置物を削除しました`);
+  }
+
   function contains(p, x, y) {
     const size = footprint(p);
     return size && x >= p.x && x < p.x + size.w && y >= p.y && y < p.y + size.h;
@@ -252,6 +351,23 @@
       drawPlacement(target, p);
     }));
     if (includeGrid) drawGrid(target);
+    if (target === ctx && selectedPlacements.size) drawSelection(target);
+  }
+
+  function drawSelection(target) {
+    const cell = getCellSize();
+    target.save();
+    target.strokeStyle = "#ffd477";
+    target.fillStyle = "rgba(255,212,119,.12)";
+    target.lineWidth = Math.max(2, cell / 24);
+    target.setLineDash([Math.max(5, cell / 8), Math.max(3, cell / 12)]);
+    selectedPlacements.forEach((p) => {
+      if (!visibleLayers.has(p.layer)) return;
+      const size = footprint(p);
+      target.fillRect(p.x * cell, p.y * cell, size.w * cell, size.h * cell);
+      target.strokeRect(p.x * cell + 2, p.y * cell + 2, size.w * cell - 4, size.h * cell - 4);
+    });
+    target.restore();
   }
 
   function drawPlacement(target, placement) {
@@ -321,10 +437,10 @@
   }
 
   function remember() { history.push(clone(map)); if (history.length > 50) history.shift(); future = []; }
-  function undo() { if (!history.length) return; future.push(clone(map)); map = history.pop(); syncFields(); render(); }
-  function redo() { if (!future.length) return; history.push(clone(map)); map = future.pop(); syncFields(); render(); }
+  function undo() { if (!history.length) return; future.push(clone(map)); map = history.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
+  function redo() { if (!future.length) return; history.push(clone(map)); map = future.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
 
-  function replaceMap(next, message) { remember(); map = validateMap(clone(next)); syncFields(); render(); setStatus(message); }
+  function replaceMap(next, message) { remember(); map = validateMap(clone(next)); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); setStatus(message); }
   function newMap() {
     const width = clamp(Number($("map-width").value), 6, 40);
     const height = clamp(Number($("map-height").value), 6, 40);
