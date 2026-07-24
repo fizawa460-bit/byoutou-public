@@ -20,7 +20,8 @@
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
     curtain: { name: "横長のカーテン", layer: "fixture", w: 9, h: 1, draw: drawCurtain },
-    toilet: { name: "トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet },
+    toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet },
+    sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink },
     partition: { name: "低い仕切り", layer: "fixture", w: 1, h: 2, draw: drawPartition },
     cabinet: { name: "小設備", layer: "fixture", w: 1, h: 1, draw: drawCabinet },
     grime: { name: "床の汚れ", layer: "overlay", w: 1, h: 1, draw: drawGrime },
@@ -645,7 +646,78 @@
   }
   function drawFuton(g, x, y, w, h) { g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 9; g.shadowOffsetY = 5; rect(g, x + 12, y + 8, w - 24, h - 16, "#c8c3b8", "#5c5953", 3); g.shadowColor = "transparent"; rect(g, x + 18, y + 14, w - 36, h * .27, "#ddd8cd", "#7d7971", 2); g.strokeStyle = "rgba(104,99,91,.28)"; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x + 20, y + h * .38 + i * 14); g.quadraticCurveTo(x + w * .5, y + h * .34 + i * 15, x + w - 20, y + h * .39 + i * 14); g.stroke(); } g.restore(); }
   function drawTable(g, x, y, w, h) { g.save(); g.shadowColor = "#111"; g.shadowBlur = 8; g.shadowOffsetX = 4; rect(g, x + 10, y + 5, w - 20, h - 10, "#5a3d22", "#26190e", 3); g.strokeStyle = "rgba(219,166,102,.28)"; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(x + 14 + i * 9, y + 9); g.lineTo(x + 14 + i * 9, y + h - 9); g.stroke(); } g.restore(); }
-  function drawToilet(g, x, y, w, h) { g.save(); g.shadowColor = "#222"; g.shadowBlur = 6; g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w * .3, h * .39, 0, 0, Math.PI * 2); g.fillStyle = "#aaa79f"; g.fill(); g.strokeStyle = "#4a4946"; g.lineWidth = 3; g.stroke(); g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w * .18, h * .25, 0, 0, Math.PI * 2); g.fillStyle = "#4d504f"; g.fill(); g.strokeStyle = "#d0ccc1"; g.stroke(); g.restore(); }
+  function drawToilet(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.6)";
+    g.shadowBlur = Math.max(5, w * .09);
+    g.shadowOffsetY = Math.max(2, h * .05);
+    const steel = g.createLinearGradient(x, y, x + w, y + h);
+    steel.addColorStop(0, "#55595a");
+    steel.addColorStop(.28, "#c4c7c4");
+    steel.addColorStop(.52, "#737777");
+    steel.addColorStop(.78, "#d2d3cf");
+    steel.addColorStop(1, "#4b4f50");
+    g.beginPath();
+    g.ellipse(x + w * .5, y + h * .56, w * .34, h * .38, 0, 0, Math.PI * 2);
+    g.fillStyle = steel;
+    g.fill();
+    g.strokeStyle = "#303334";
+    g.lineWidth = Math.max(2, w * .045);
+    g.stroke();
+    g.shadowColor = "transparent";
+    g.beginPath();
+    g.ellipse(x + w * .5, y + h * .57, w * .2, h * .25, 0, 0, Math.PI * 2);
+    g.fillStyle = "#252b2d";
+    g.fill();
+    g.strokeStyle = "#d8d9d4";
+    g.lineWidth = Math.max(2, w * .035);
+    g.stroke();
+    rect(g, x + w * .27, y + h * .08, w * .46, h * .2, steel, "#343738", Math.max(2, w * .035));
+    g.fillStyle = "#bfc2bf";
+    g.beginPath();
+    g.arc(x + w * .5, y + h * .18, Math.max(2, w * .045), 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  function drawSink(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.58)";
+    g.shadowBlur = Math.max(5, w * .08);
+    g.shadowOffsetY = Math.max(2, h * .05);
+    const steel = g.createLinearGradient(x, y, x + w, y);
+    steel.addColorStop(0, "#4a4e4f");
+    steel.addColorStop(.2, "#c4c7c4");
+    steel.addColorStop(.48, "#717676");
+    steel.addColorStop(.76, "#d1d2ce");
+    steel.addColorStop(1, "#4b4f50");
+    rect(g, x + w * .08, y + h * .12, w * .84, h * .76, steel, "#303334", Math.max(2, w * .04));
+    g.shadowColor = "transparent";
+    g.beginPath();
+    g.ellipse(x + w * .5, y + h * .55, w * .31, h * .24, 0, 0, Math.PI * 2);
+    g.fillStyle = "#333a3c";
+    g.fill();
+    g.strokeStyle = "#e0e1dd";
+    g.lineWidth = Math.max(2, w * .035);
+    g.stroke();
+    g.beginPath();
+    g.arc(x + w * .5, y + h * .56, Math.max(2, w * .04), 0, Math.PI * 2);
+    g.fillStyle = "#171b1c";
+    g.fill();
+    g.strokeStyle = "#929795";
+    g.stroke();
+    g.strokeStyle = "#d7d9d5";
+    g.lineWidth = Math.max(3, w * .07);
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(x + w * .5, y + h * .2);
+    g.lineTo(x + w * .5, y + h * .34);
+    g.lineTo(x + w * .6, y + h * .39);
+    g.stroke();
+    g.fillStyle = "#858a89";
+    g.fillRect(x + w * .22, y + h * .2, w * .1, h * .08);
+    g.fillRect(x + w * .68, y + h * .2, w * .1, h * .08);
+    g.restore();
+  }
   function drawPartition(g, x, y, w, h) { g.save(); g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 8; g.shadowOffsetX = 5; const grad = g.createLinearGradient(x, y, x + w, y); grad.addColorStop(0, "#4b4a46"); grad.addColorStop(.5, "#89857b"); grad.addColorStop(1, "#4a4946"); rect(g, x + 20, y + 3, w - 40, h - 6, grad, "#2b2b29", 2); g.restore(); }
   function drawCabinet(g, x, y, w, h) { g.save(); g.shadowColor = "#111"; g.shadowBlur = 7; rect(g, x + 6, y + 13, w - 12, h - 19, "#3e3124", "#17120d", 3); g.fillStyle = "#806040"; g.fillRect(x + 10, y + 17, w - 20, 5); g.restore(); }
   function drawGrime(g, x, y, w, h) { g.save(); for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(38,31,22,${.05 + (i % 3) * .04})`; g.beginPath(); g.arc(x + (i * 23 + 13) % w, y + (i * 17 + 20) % h, 2 + (i % 4) * 2, 0, Math.PI * 2); g.fill(); } g.restore(); }
