@@ -304,6 +304,9 @@
   function deleteSelectedPlacements() {
     if (!selectedPlacements.size) return setStatus("削除する配置物を選択してください");
     const count = selectedPlacements.size;
+    if (count > 1 && !window.confirm(`選択中の配置物${count}個をマップから削除しますか？`)) {
+      return setStatus("配置物の削除をキャンセルしました");
+    }
     remember();
     map.placements = map.placements.filter((p) => !selectedPlacements.has(p));
     selectedPlacements.clear();
