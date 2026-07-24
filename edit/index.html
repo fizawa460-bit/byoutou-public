@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>病棟マップエディタ</title>
-  <link rel="stylesheet" href="style.css?v=20260724-1">
+  <link rel="stylesheet" href="style.css?v=20260724-2">
 </head>
 <body>
   <header class="app-header">
@@ -59,13 +59,13 @@
         <div class="selection-tools" aria-label="複数選択した配置物の操作">
           <span id="selection-count">選択 0個</span>
           <button id="select-visible" type="button">編集中を全選択</button>
-          <button id="clear-selection" type="button">選択解除</button>
+          <button id="clear-selection" type="button">選択枠を解除</button>
           <span class="move-label">まとめて移動</span>
           <button class="move-selection" data-dx="0" data-dy="-1" type="button" title="上へ移動">↑</button>
           <button class="move-selection" data-dx="-1" data-dy="0" type="button" title="左へ移動">←</button>
           <button class="move-selection" data-dx="0" data-dy="1" type="button" title="下へ移動">↓</button>
           <button class="move-selection" data-dx="1" data-dy="0" type="button" title="右へ移動">→</button>
-          <button id="delete-selection" type="button">選択を削除</button>
+          <button id="delete-selection" type="button" class="danger">配置物を削除</button>
         </div>
         <div class="layer-tools" aria-label="レイヤー表示設定">
           <span>表示</span>
@@ -104,6 +104,6 @@
     </aside>
   </main>
 
-  <script src="editor.js?v=20260724-1"></script>
+  <script src="editor.js?v=20260724-2"></script>
 </body>
 </html>
