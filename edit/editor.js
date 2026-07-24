@@ -30,7 +30,7 @@
 
   const sample = {
     version: 1,
-    name: "ソフト監禁室・見本",
+    name: "ハード監禁室ver1.0",
     cellSize: CELL,
     width: 12,
     height: 14,
