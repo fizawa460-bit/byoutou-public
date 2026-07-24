@@ -11,12 +11,14 @@
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
     floorDark: { name: "暗い床", layer: "floor", w: 1, h: 1, draw: drawFloorDark },
     wallTop: { name: "上壁", layer: "structure", w: 1, h: 1, draw: drawWallTop },
-    wallSide: { name: "側壁", layer: "structure", w: 1, h: 1, draw: drawWallSide },
+    wallSide: { name: "側壁", layer: "structure", w: 1, h: 1, draw: drawWallSide, rotations: [0, 45, 90, 135] },
     bars: { name: "鉄格子窓", layer: "structure", w: 3, h: 1, draw: drawBars },
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
-    door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor },
+    door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
+    window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
-    table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable },
+    table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
+    curtain: { name: "横長のカーテン", layer: "fixture", w: 9, h: 1, draw: drawCurtain },
     toilet: { name: "トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet },
     partition: { name: "低い仕切り", layer: "fixture", w: 1, h: 2, draw: drawPartition },
     cabinet: { name: "小設備", layer: "fixture", w: 1, h: 1, draw: drawCabinet },
@@ -29,31 +31,42 @@
     name: "ソフト監禁室・見本",
     cellSize: CELL,
     width: 12,
-    height: 11,
+    height: 14,
     placements: [
-      ...Array.from({ length: 12 * 11 }, (_, i) => ({ tile: "floor", x: i % 12, y: Math.floor(i / 12), layer: "floor" })),
-      ...Array.from({ length: 12 }, (_, x) => ({ tile: "wallTop", x, y: 0, layer: "structure" })),
-      ...Array.from({ length: 12 }, (_, x) => ({ tile: "wallTop", x, y: 10, layer: "structure" })),
-      ...Array.from({ length: 9 }, (_, i) => ({ tile: "wallSide", x: 0, y: i + 1, layer: "structure" })),
-      ...Array.from({ length: 9 }, (_, i) => ({ tile: "wallSide", x: 11, y: i + 1, layer: "structure" })),
-      { tile: "bars", x: 5, y: 0, layer: "structure" },
-      { tile: "door", x: 5, y: 10, layer: "structure" },
-      { tile: "rail", x: 1, y: 1, layer: "structure", rotation: 0 },
-      { tile: "rail", x: 4, y: 1, layer: "structure", rotation: 0 },
-      { tile: "rail", x: 7, y: 1, layer: "structure", rotation: 0 },
-      { tile: "rail", x: 1, y: 2, layer: "structure", rotation: 90 },
-      { tile: "rail", x: 1, y: 5, layer: "structure", rotation: 90 },
-      { tile: "rail", x: 10, y: 2, layer: "structure", rotation: 90 },
-      { tile: "rail", x: 10, y: 5, layer: "structure", rotation: 90 },
-      { tile: "futon", x: 4, y: 3, layer: "fixture" },
-      { tile: "table", x: 9, y: 3, layer: "fixture" },
-      { tile: "partition", x: 8, y: 7, layer: "fixture" },
-      { tile: "toilet", x: 9, y: 8, layer: "fixture" },
-      { tile: "cabinet", x: 1, y: 8, layer: "fixture" },
-      { tile: "grime", x: 3, y: 7, layer: "overlay" },
-      { tile: "grime", x: 7, y: 5, layer: "overlay" },
-      { tile: "shadow", x: 0, y: 9, layer: "overlay" },
-      { tile: "shadow", x: 11, y: 9, layer: "overlay" }
+      ...Array.from({ length: 12 * 13 }, (_, i) => ({ tile: "floor", x: i % 12, y: Math.floor(i / 12) + 1, layer: "floor" })),
+      ...[0, 1, 11].map((x) => ({ tile: "wallTop", x, y: 3, layer: "structure" })),
+      ...[0, 1, 7, 8, 9, 10, 11].map((x) => ({ tile: "wallTop", x, y: 13, layer: "structure" })),
+      { tile: "wallTop", x: 10, y: 1, layer: "structure" },
+      ...[1, 2, ...Array.from({ length: 9 }, (_, i) => i + 4)].map((y) => ({ tile: "wallSide", x: 0, y, layer: "structure" })),
+      ...[1, 2, ...Array.from({ length: 9 }, (_, i) => i + 4)].map((y) => ({ tile: "wallSide", x: 11, y, layer: "structure" })),
+      { tile: "bars", x: 1, y: 1, layer: "structure" },
+      { tile: "bars", x: 4, y: 1, layer: "structure" },
+      { tile: "bars", x: 7, y: 1, layer: "structure" },
+      { tile: "bars", x: 2, y: 3, layer: "structure" },
+      { tile: "bars", x: 5, y: 3, layer: "structure" },
+      { tile: "bars", x: 8, y: 3, layer: "structure" },
+      { tile: "bars", x: 4, y: 13, layer: "structure" },
+      { tile: "door", x: 2, y: 13, layer: "structure" },
+      { tile: "rail", x: 3, y: 5, layer: "structure", rotation: 0, width: 6, height: 1 },
+      { tile: "rail", x: 2, y: 6, layer: "structure", rotation: 90, width: 1, height: 7 },
+      { tile: "rail", x: 9, y: 4, layer: "structure", rotation: 45, width: 2, height: 2 },
+      { tile: "rail", x: 1, y: 4, layer: "structure", rotation: 135, width: 2, height: 2 },
+      { tile: "rail", x: 9, y: 6, layer: "structure", rotation: 90 },
+      { tile: "rail", x: 9, y: 9, layer: "structure", rotation: 0, width: 2, height: 1 },
+      { tile: "futon", x: 4, y: 6, layer: "fixture" },
+      { tile: "table", x: 5, y: 11, layer: "fixture" },
+      { tile: "table", x: 6, y: 11, layer: "fixture" },
+      { tile: "partition", x: 8, y: 11, layer: "fixture" },
+      { tile: "toilet", x: 9, y: 12, layer: "fixture" },
+      { tile: "cabinet", x: 1, y: 11, layer: "fixture" },
+      { tile: "grime", x: 3, y: 10, layer: "overlay" },
+      { tile: "grime", x: 7, y: 8, layer: "overlay" },
+      { tile: "grime", x: 9, y: 11, layer: "overlay" },
+      { tile: "grime", x: 10, y: 11, layer: "overlay" },
+      { tile: "grime", x: 10, y: 12, layer: "overlay" },
+      { tile: "shadow", x: 0, y: 12, layer: "overlay" },
+      { tile: "shadow", x: 11, y: 11, layer: "overlay" },
+      { tile: "shadow", x: 11, y: 12, layer: "overlay" }
     ]
   };
 
@@ -115,7 +128,7 @@
     $("redo").addEventListener("click", redo);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
     $("layer-select").addEventListener("change", (event) => { showLayer(event.target.value); setStatus(`${layerName(event.target.value)}を編集中`); });
-    $("rotation-select").addEventListener("change", (event) => { selectedRotation = Number(event.target.value); resetSelectedSize(); setStatus(`レールの向き：${selectedRotation}°`); });
+    $("rotation-select").addEventListener("change", (event) => { selectedRotation = Number(event.target.value); resetSelectedSize(); setStatus(`${tiles[selectedTile].name}の向き：${selectedRotation}°`); });
     $("tile-width").addEventListener("change", syncSelectedSize);
     $("tile-height").addEventListener("change", syncSelectedSize);
     $("reset-tile-size").addEventListener("click", resetSelectedSize);
@@ -211,12 +224,13 @@
     const tile = tiles[tileId];
     const normal = defaultFootprint(tileId, selectedRotation);
     const customSize = selectedWidth !== normal.w || selectedHeight !== normal.h;
-    const next = { tile: tileId, x, y, layer: tile.layer, ...(tileId === "rail" ? { rotation: selectedRotation } : {}), ...(customSize ? { width: selectedWidth, height: selectedHeight } : {}) };
+    const canRotate = Array.isArray(tile.rotations);
+    const next = { tile: tileId, x, y, layer: tile.layer, ...(canRotate ? { rotation: selectedRotation } : {}), ...(customSize ? { width: selectedWidth, height: selectedHeight } : {}) };
     const size = footprint(next);
     if (x + size.w > map.width || y + size.h > map.height) return setStatus("マップの外には配置できません");
     map.placements = map.placements.filter((p) => p.layer !== tile.layer || !overlaps(p, next));
     map.placements.push(next);
-    setStatus(`${tile.name}：${x}, ${y}${tileId === "rail" ? ` / ${selectedRotation}°` : ""}`);
+    setStatus(`${tile.name}：${x}, ${y}${canRotate ? ` / ${selectedRotation}°` : ""}`);
   }
 
   function removeAt(x, y, layer) {
@@ -337,10 +351,13 @@
   function defaultFootprint(tileId, rotation = 0) {
     const tile = tiles[tileId];
     if (!tile) return { w: 1, h: 1 };
-    if (tileId !== "rail") return { w: tile.w, h: tile.h };
-    if (rotation === 90) return { w: 1, h: 3 };
-    if (rotation === 45 || rotation === 135) return { w: 3, h: 3 };
-    return { w: 3, h: 1 };
+    if (!Array.isArray(tile.rotations) || rotation === 0) return { w: tile.w, h: tile.h };
+    if (rotation === 90) return { w: tile.h, h: tile.w };
+    if (rotation === 45 || rotation === 135) {
+      const span = Math.max(1, Math.ceil((tile.w + tile.h) / Math.SQRT2));
+      return { w: span, h: span };
+    }
+    return { w: tile.w, h: tile.h };
   }
 
   function render(target = ctx, includeGrid = showGrid) {
@@ -385,7 +402,9 @@
     target.save();
     target.translate(x, y);
     target.scale(cell / CELL, cell / CELL);
-    if (placement.tile === "rail") drawRailRotated(target, 0, 0, baseWidth, baseHeight, Number(placement.rotation || 0));
+    const rotation = Number(placement.rotation || 0);
+    if (placement.tile === "rail") drawRailRotated(target, 0, 0, baseWidth, baseHeight, rotation);
+    else if (Array.isArray(tile.rotations)) drawTileRotated(target, tile, baseWidth, baseHeight, rotation);
     else tile.draw(target, 0, 0, baseWidth, baseHeight, false);
     target.restore();
   }
@@ -499,7 +518,7 @@
       const rotation = tiles[p.tile].rotations?.includes(Number(p.rotation)) ? Number(p.rotation) : 0;
       const normal = defaultFootprint(p.tile, rotation);
       const hasCustomSize = Number.isInteger(p.width) && Number.isInteger(p.height) && (p.width !== normal.w || p.height !== normal.h);
-      return { tile: p.tile, x: p.x, y: p.y, layer: tiles[p.tile].layer, ...(p.tile === "rail" ? { rotation } : {}), ...(hasCustomSize ? { width: clamp(p.width, 1, 12), height: clamp(p.height, 1, 12) } : {}) };
+      return { tile: p.tile, x: p.x, y: p.y, layer: tiles[p.tile].layer, ...(Array.isArray(tiles[p.tile].rotations) ? { rotation } : {}), ...(hasCustomSize ? { width: clamp(p.width, 1, 12), height: clamp(p.height, 1, 12) } : {}) };
     });
     if (value.floorFill && !value.placements.some((p) => p.layer === "floor")) {
       value.placements.unshift(...Array.from({ length: value.width * value.height }, (_, i) => ({ tile: "floor", x: i % value.width, y: Math.floor(i / value.width), layer: "floor" })));
@@ -551,7 +570,59 @@
     g.beginPath(); g.moveTo(x1 - 1, y1 - 1); g.lineTo(x2 - 1, y2 - 1); g.stroke();
     g.restore();
   }
+  function drawTileRotated(g, tile, w, h, rotation) {
+    if (rotation === 0) return tile.draw(g, 0, 0, w, h, false);
+    const angle = rotation * Math.PI / 180;
+    const nativeWidth = tile.w * CELL;
+    const nativeHeight = tile.h * CELL;
+    const cos = Math.abs(Math.cos(angle));
+    const sin = Math.abs(Math.sin(angle));
+    const rotatedWidth = nativeWidth * cos + nativeHeight * sin;
+    const rotatedHeight = nativeWidth * sin + nativeHeight * cos;
+    const scale = Math.min(w / rotatedWidth, h / rotatedHeight);
+    const drawWidth = nativeWidth * scale;
+    const drawHeight = nativeHeight * scale;
+    g.save();
+    g.translate(w / 2, h / 2);
+    g.rotate(angle);
+    tile.draw(g, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight, false);
+    g.restore();
+  }
   function drawDoor(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 12, y + 7, w - 24, h - 10, "#343536", "#151515", 3); rect(g, x + w * .38, y + 14, w * .24, 12, "#151515", "#9b968d", 2); }
+  function drawWindow(g, x, y, w, h) {
+    const frame = Math.max(5, Math.min(w, h) * .12);
+    rect(g, x, y, w, h, "#5d5f60", "#222", 3);
+    const grad = g.createLinearGradient(x, y + frame, x, y + h - frame);
+    grad.addColorStop(0, "#879ba1");
+    grad.addColorStop(.55, "#37464b");
+    grad.addColorStop(1, "#1c2428");
+    rect(g, x + frame, y + frame, w - frame * 2, h - frame * 2, grad, "#a9aaa5", 2);
+    g.strokeStyle = "rgba(220,225,220,.65)";
+    g.lineWidth = Math.max(2, frame * .45);
+    for (let i = 1; i < 3; i++) {
+      const px = x + frame + (w - frame * 2) * i / 3;
+      g.beginPath();
+      g.moveTo(px, y + frame);
+      g.lineTo(px, y + h - frame);
+      g.stroke();
+    }
+  }
+  function drawCurtain(g, x, y, w, h) {
+    const grad = g.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, "#aaa59a");
+    grad.addColorStop(1, "#5b5955");
+    rect(g, x + 3, y + 4, w - 6, h - 8, grad, "#343331", 2);
+    const folds = Math.max(4, Math.round(w / 42));
+    for (let i = 1; i < folds; i++) {
+      const px = x + w * i / folds;
+      g.strokeStyle = i % 2 ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.25)";
+      g.lineWidth = Math.max(2, h * .05);
+      g.beginPath();
+      g.moveTo(px, y + 7);
+      g.quadraticCurveTo(px - 5, y + h / 2, px + 2, y + h - 7);
+      g.stroke();
+    }
+  }
   function drawFuton(g, x, y, w, h) { g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 9; g.shadowOffsetY = 5; rect(g, x + 12, y + 8, w - 24, h - 16, "#c8c3b8", "#5c5953", 3); g.shadowColor = "transparent"; rect(g, x + 18, y + 14, w - 36, h * .27, "#ddd8cd", "#7d7971", 2); g.strokeStyle = "rgba(104,99,91,.28)"; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x + 20, y + h * .38 + i * 14); g.quadraticCurveTo(x + w * .5, y + h * .34 + i * 15, x + w - 20, y + h * .39 + i * 14); g.stroke(); } g.restore(); }
   function drawTable(g, x, y, w, h) { g.save(); g.shadowColor = "#111"; g.shadowBlur = 8; g.shadowOffsetX = 4; rect(g, x + 10, y + 5, w - 20, h - 10, "#5a3d22", "#26190e", 3); g.strokeStyle = "rgba(219,166,102,.28)"; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(x + 14 + i * 9, y + 9); g.lineTo(x + 14 + i * 9, y + h - 9); g.stroke(); } g.restore(); }
   function drawToilet(g, x, y, w, h) { g.save(); g.shadowColor = "#222"; g.shadowBlur = 6; g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w * .3, h * .39, 0, 0, Math.PI * 2); g.fillStyle = "#aaa79f"; g.fill(); g.strokeStyle = "#4a4946"; g.lineWidth = 3; g.stroke(); g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w * .18, h * .25, 0, 0, Math.PI * 2); g.fillStyle = "#4d504f"; g.fill(); g.strokeStyle = "#d0ccc1"; g.stroke(); g.restore(); }
