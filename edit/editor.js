@@ -15,6 +15,7 @@
     bars: { name: "鉄格子窓", layer: "structure", w: 3, h: 1, draw: drawBars },
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
+    doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 45, 90, 135] },
     window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
@@ -352,6 +353,7 @@
     const tile = tiles[tileId];
     if (!tile) return { w: 1, h: 1 };
     if (!Array.isArray(tile.rotations) || rotation === 0) return { w: tile.w, h: tile.h };
+    if (tile.w === tile.h) return { w: tile.w, h: tile.h };
     if (rotation === 90) return { w: tile.h, h: tile.w };
     if (rotation === 45 || rotation === 135) {
       const span = Math.max(1, Math.ceil((tile.w + tile.h) / Math.SQRT2));
@@ -589,6 +591,24 @@
     g.restore();
   }
   function drawDoor(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 12, y + 7, w - 24, h - 10, "#343536", "#151515", 3); rect(g, x + w * .38, y + 14, w * .24, 12, "#151515", "#9b968d", 2); }
+  function drawDoorSmall(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.55)";
+    g.shadowBlur = Math.max(4, h * .08);
+    g.shadowOffsetY = Math.max(2, h * .05);
+    rect(g, x + w * .05, y + h * .22, w * .9, h * .56, "#393a3b", "#151515", Math.max(2, h * .04));
+    g.shadowColor = "transparent";
+    g.fillStyle = "rgba(255,255,255,.12)";
+    g.fillRect(x + w * .09, y + h * .27, w * .82, Math.max(2, h * .05));
+    rect(g, x + w * .36, y + h * .36, w * .28, h * .12, "#171819", "#aaa69d", Math.max(1, h * .025));
+    g.fillStyle = "#aaa69d";
+    g.beginPath();
+    g.arc(x + w * .78, y + h * .57, Math.max(2, h * .045), 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#70716e";
+    g.fillRect(x + w * .08, y + h * .72, w * .84, Math.max(2, h * .045));
+    g.restore();
+  }
   function drawWindow(g, x, y, w, h) {
     const frame = Math.max(5, Math.min(w, h) * .12);
     rect(g, x, y, w, h, "#5d5f60", "#222", 3);
