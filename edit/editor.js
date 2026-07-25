@@ -11,6 +11,7 @@
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
     floorDark: { name: "暗い床", layer: "floor", w: 1, h: 1, draw: drawFloorDark },
     wallTop: { name: "上壁", layer: "structure", w: 1, h: 1, draw: drawWallTop },
+    peekWindow: { name: "覗き小窓", layer: "structure", w: 1, h: 1, draw: drawPeekWindow },
     wallSide: { name: "側壁", layer: "structure", w: 1, h: 1, draw: drawWallSide, rotations: [0, 45, 90, 135] },
     bars: { name: "鉄格子窓", layer: "structure", w: 3, h: 1, draw: drawBars },
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
@@ -35,32 +36,22 @@
     width: 12,
     height: 14,
     placements: [
-      ...Array.from({ length: 12 * 13 }, (_, i) => ({ tile: "floor", x: i % 12, y: Math.floor(i / 12) + 1, layer: "floor" })),
-      ...[0, 1, 11].map((x) => ({ tile: "wallTop", x, y: 3, layer: "structure" })),
+      ...Array.from({ length: 12 * 13 }, (_, i) => ({ tile: "floor", x: i % 12, y: Math.floor(i / 12) + 1, layer: "floor" }))
+        .filter(({ x, y }) => !([9, 10].includes(x) && [11, 12].includes(y))),
+      { tile: "wallTop", x: 0, y: 3, layer: "structure" },
+      { tile: "wallTop", x: 11, y: 3, layer: "structure" },
       ...[0, 1, 7, 8, 9, 10, 11].map((x) => ({ tile: "wallTop", x, y: 13, layer: "structure" })),
-      { tile: "wallTop", x: 10, y: 1, layer: "structure" },
-      ...[1, 2, ...Array.from({ length: 9 }, (_, i) => i + 4)].map((y) => ({ tile: "wallSide", x: 0, y, layer: "structure" })),
-      ...[1, 2, ...Array.from({ length: 9 }, (_, i) => i + 4)].map((y) => ({ tile: "wallSide", x: 11, y, layer: "structure" })),
-      { tile: "bars", x: 1, y: 1, layer: "structure" },
-      { tile: "bars", x: 4, y: 1, layer: "structure" },
-      { tile: "bars", x: 7, y: 1, layer: "structure" },
-      { tile: "bars", x: 2, y: 3, layer: "structure" },
-      { tile: "bars", x: 5, y: 3, layer: "structure" },
-      { tile: "bars", x: 8, y: 3, layer: "structure" },
+      ...Array.from({ length: 8 }, (_, i) => ({ tile: "wallSide", x: 0, y: i + 5, layer: "structure", rotation: 0 })),
+      ...Array.from({ length: 9 }, (_, i) => ({ tile: "wallSide", x: 11, y: i + 4, layer: "structure", rotation: 0 })),
       { tile: "bars", x: 4, y: 13, layer: "structure" },
-      { tile: "door", x: 2, y: 13, layer: "structure" },
+      { tile: "door", x: 2, y: 13, layer: "structure", rotation: 0 },
       { tile: "rail", x: 3, y: 5, layer: "structure", rotation: 0, width: 6, height: 1 },
       { tile: "rail", x: 2, y: 6, layer: "structure", rotation: 90, width: 1, height: 7 },
       { tile: "rail", x: 9, y: 4, layer: "structure", rotation: 45, width: 2, height: 2 },
       { tile: "rail", x: 1, y: 4, layer: "structure", rotation: 135, width: 2, height: 2 },
       { tile: "rail", x: 9, y: 6, layer: "structure", rotation: 90 },
       { tile: "rail", x: 9, y: 9, layer: "structure", rotation: 0, width: 2, height: 1 },
-      { tile: "futon", x: 4, y: 6, layer: "fixture" },
-      { tile: "table", x: 5, y: 11, layer: "fixture" },
-      { tile: "table", x: 6, y: 11, layer: "fixture" },
       { tile: "partition", x: 8, y: 11, layer: "fixture" },
-      { tile: "toilet", x: 9, y: 12, layer: "fixture" },
-      { tile: "cabinet", x: 1, y: 11, layer: "fixture" },
       { tile: "grime", x: 3, y: 10, layer: "overlay" },
       { tile: "grime", x: 7, y: 8, layer: "overlay" },
       { tile: "grime", x: 9, y: 11, layer: "overlay" },
@@ -68,7 +59,27 @@
       { tile: "grime", x: 10, y: 12, layer: "overlay" },
       { tile: "shadow", x: 0, y: 12, layer: "overlay" },
       { tile: "shadow", x: 11, y: 11, layer: "overlay" },
-      { tile: "shadow", x: 11, y: 12, layer: "overlay" }
+      { tile: "shadow", x: 11, y: 12, layer: "overlay" },
+      { tile: "toilet", x: 10, y: 12, layer: "fixture", rotation: 90 },
+      ...[1, 3, 5, 7, 9].map((x) => ({ tile: "bars", x, y: 3, layer: "structure", width: 2, height: 1 })),
+      { tile: "window", x: 1, y: 0, layer: "structure", width: 10, height: 1 },
+      { tile: "curtain", x: 10, y: 0, layer: "fixture", width: 1, height: 1 },
+      { tile: "curtain", x: 1, y: 0, layer: "fixture", width: 1, height: 1 },
+      { tile: "sink", x: 10, y: 11, layer: "fixture", rotation: 90 },
+      { tile: "wallTop", x: 11, y: 0, layer: "structure" },
+      { tile: "wallTop", x: 0, y: 0, layer: "structure" },
+      { tile: "doorSmall", x: 11, y: 2, layer: "structure", rotation: 90 },
+      { tile: "doorSmall", x: 0, y: 2, layer: "structure", rotation: 90 },
+      { tile: "futon", x: 5, y: 6, layer: "fixture" },
+      { tile: "cabinet", x: 10, y: 8, layer: "fixture" },
+      { tile: "floorDark", x: 9, y: 12, layer: "floor" },
+      { tile: "floorDark", x: 9, y: 11, layer: "floor" },
+      { tile: "floorDark", x: 10, y: 11, layer: "floor" },
+      { tile: "floorDark", x: 10, y: 12, layer: "floor" },
+      { tile: "table", x: 4, y: 12, layer: "fixture", rotation: 90, width: 3, height: 1 },
+      { tile: "wallSide", x: 11, y: 1, layer: "structure", rotation: 0 },
+      { tile: "wallSide", x: 0, y: 4, layer: "structure", rotation: 0 },
+      { tile: "wallSide", x: 0, y: 1, layer: "structure", rotation: 0 }
     ]
   };
 
@@ -547,6 +558,26 @@
   function drawFloor(g, x, y, w, h) { rect(g, x, y, w, h, "#77736b", "#59564f", 2); g.fillStyle = "rgba(255,255,255,.035)"; for (let i = 0; i < 8; i++) g.fillRect(x + (i * 19 + y) % w, y + (i * 31 + x) % h, 2, 2); }
   function drawFloorDark(g, x, y, w, h) { rect(g, x, y, w, h, "#55534e", "#42413d", 2); }
   function drawWallTop(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x, y + h); grad.addColorStop(0, "#a09b91"); grad.addColorStop(.18, "#6c6963"); grad.addColorStop(1, "#393a39"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(x + 3, y + 4, w - 6, 5); }
+  function drawPeekWindow(g, x, y, w, h) {
+    drawWallTop(g, x, y, w, h);
+    const frameX = x + w * .1;
+    const frameY = y + h * .29;
+    const frameW = w * .8;
+    const frameH = h * .38;
+    rect(g, frameX, frameY, frameW, frameH, "#292b2b", "#171818", Math.max(2, w * .035));
+    const glass = g.createLinearGradient(frameX, frameY, frameX, frameY + frameH);
+    glass.addColorStop(0, "#8e9b9c");
+    glass.addColorStop(.22, "#546163");
+    glass.addColorStop(.62, "#20292b");
+    glass.addColorStop(1, "#101516");
+    rect(g, frameX + w * .07, frameY + h * .07, frameW - w * .14, frameH - h * .14, glass, "#aaa9a2", Math.max(1, w * .02));
+    g.fillStyle = "rgba(235,240,235,.34)";
+    g.fillRect(frameX + w * .12, frameY + h * .1, frameW * .45, Math.max(2, h * .035));
+    g.fillStyle = "#76766f";
+    g.fillRect(frameX + frameW * .47, frameY + h * .03, Math.max(2, w * .05), frameH - h * .06);
+    g.fillStyle = "#242525";
+    g.fillRect(x + w * .35, y + h * .73, w * .3, Math.max(2, h * .055));
+  }
   function drawWallSide(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x + w, y); grad.addColorStop(0, "#302f2e"); grad.addColorStop(.5, "#77736c"); grad.addColorStop(1, "#3a3937"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(x + 8, y + 3, 5, h - 6); }
   function drawBars(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 8, y + 10, w - 16, h - 18, "#171819", "#aaa49a", 3); for (let i = 0; i < 8; i++) { const bx = x + 19 + i * ((w - 38) / 7); g.fillStyle = "#c8c7c1"; g.fillRect(bx - 3, y + 15, 6, h - 28); g.fillStyle = "#4a4b4c"; g.fillRect(bx + 2, y + 15, 3, h - 28); } }
   function drawRailH(g, x, y, w, h) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x + 7, y + h * .54, w - 14, 8); g.fillStyle = "#dedbd2"; g.fillRect(x + 6, y + h * .45, w - 12, 6); g.fillStyle = "#6b6964"; g.fillRect(x + 6, y + h * .45 + 6, w - 12, 3); }
