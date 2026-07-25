@@ -1,4 +1,4 @@
-const APP_VERSION = "ver0.24";
+const APP_VERSION = "ver0.25";
 const DEBUG = true;
 const SAVE_VERSION = 2;
 const SAVE_KEYS = {
@@ -26,7 +26,7 @@ const SOFT_ROOM_CONFIG = {
   nurseCPatrolInterval: 2,
   doorPatrolStep: 3,
   hiddenLoopClicksToReveal: 5,
-  hiddenLoopLockMs: 5000
+  deathDay: 4
 };
 const DEATH_CONFIG = {
   warnAfterSameCauseDeaths: 1,
@@ -42,6 +42,7 @@ const ACHIEVEMENTS = [
   {
     id: "softRoomClear",
     name: "ソフト監禁室クリア",
+    notificationText: "世界パッチが適用。残量が減りました。",
     lockedImage: "assets/achievements/IB1_soft_room_locked.png",
     unlockedImage: "assets/achievements/IB2_soft_room_unlocked.png"
   },
@@ -95,7 +96,8 @@ const STORY = {
     ESCAPE_READY: 4
   },
   HARD_ROOM: {
-    START: 0
+    START: 0,
+    ENTRANCE_LOOP: 1
   }
 };
 
@@ -107,10 +109,9 @@ const story = {
 };
 
 const flags = {
-  loopButtonLocked: false,
   paperCupPlacedThisLoop: false,
   paperCupProviderIdThisLoop: null,
-  metNurseZOnPatrol: false,
+  toiletLightSignaledThisNight: false,
   nameRegistered: false,
   reachedDoorUnlock: false,
   reachedFootwork: false,
@@ -305,7 +306,6 @@ function createSaveData() {
     },
     flags: {
       nameRegistered: flags.nameRegistered,
-      metNurseZOnPatrol: flags.metNurseZOnPatrol,
       reachedDoorUnlock: flags.reachedDoorUnlock,
       reachedFootwork: flags.reachedFootwork,
       heardNurseCShortcutHint: flags.heardNurseCShortcutHint,
@@ -316,7 +316,6 @@ function createSaveData() {
     counters: {
       deaths: counters.deaths,
       waterDeaths: counters.waterDeaths,
-      nurseZDoorTalks: counters.nurseZDoorTalks,
       mealDeaths: counters.mealDeaths
     },
     deathCauseCounts: { ...deathCauseCounts },
@@ -336,7 +335,6 @@ function getDefaultSaveData() {
     },
     flags: {
       nameRegistered: false,
-      metNurseZOnPatrol: false,
       reachedDoorUnlock: false,
       reachedFootwork: false,
       heardNurseCShortcutHint: false,
@@ -347,7 +345,6 @@ function getDefaultSaveData() {
     counters: {
       deaths: 0,
       waterDeaths: 0,
-      nurseZDoorTalks: 0,
       mealDeaths: 0
     },
     deathCauseCounts: {},
@@ -393,7 +390,6 @@ function normalizeSaveData(data) {
     },
     flags: {
       nameRegistered: data.flags?.nameRegistered === true,
-      metNurseZOnPatrol: data.flags?.metNurseZOnPatrol === true,
       reachedDoorUnlock: data.flags?.reachedDoorUnlock === true,
       reachedFootwork: data.flags?.reachedFootwork === true,
       heardNurseCShortcutHint: data.flags?.heardNurseCShortcutHint === true,
@@ -404,7 +400,6 @@ function normalizeSaveData(data) {
     counters: {
       deaths: nonNegativeInteger(data.counters?.deaths),
       waterDeaths: nonNegativeInteger(data.counters?.waterDeaths),
-      nurseZDoorTalks: nonNegativeInteger(data.counters?.nurseZDoorTalks),
       mealDeaths: nonNegativeInteger(data.counters?.mealDeaths)
     },
     deathCauseCounts: normalizedDeathCauseCounts,
@@ -437,7 +432,6 @@ function applySaveData(data) {
   story.chapter = normalized.story.chapter;
   story.progress = normalized.story.progress;
   flags.nameRegistered = normalized.flags.nameRegistered;
-  flags.metNurseZOnPatrol = normalized.flags.metNurseZOnPatrol;
   flags.reachedDoorUnlock = normalized.flags.reachedDoorUnlock;
   flags.reachedFootwork = normalized.flags.reachedFootwork;
   flags.heardNurseCShortcutHint = normalized.flags.heardNurseCShortcutHint;
@@ -446,7 +440,7 @@ function applySaveData(data) {
   flags.footworkDonationUnlocked = normalized.flags.footworkDonationUnlocked;
   counters.deaths = normalized.counters.deaths;
   counters.waterDeaths = normalized.counters.waterDeaths;
-  counters.nurseZDoorTalks = normalized.counters.nurseZDoorTalks;
+  counters.nurseZDoorTalks = 0;
   counters.mealDeaths = normalized.counters.mealDeaths;
   Object.keys(deathCauseCounts).forEach(id => delete deathCauseCounts[id]);
   Object.assign(deathCauseCounts, normalized.deathCauseCounts);
@@ -459,10 +453,9 @@ function applySaveData(data) {
   seenTextIds.clear();
   normalized.seenTextIds.forEach(id => seenTextIds.add(id));
   playerName = normalized.playerName;
-
-  flags.loopButtonLocked = false;
   flags.paperCupPlacedThisLoop = false;
   flags.paperCupProviderIdThisLoop = null;
+  flags.toiletLightSignaledThisNight = false;
   counters.hiddenLoopClicks = 0;
   counters.cleanings = 0;
   counters.patrols = 0;
@@ -524,8 +517,8 @@ function formatSaveSlot(slot, label) {
   const data = result.data;
   return [
     `${label}: chapter=${data.story.chapter} progress=${data.story.progress} name=${JSON.stringify(data.playerName)}`,
-    `  flags nameRegistered=${data.flags.nameRegistered} metNurseZOnPatrol=${data.flags.metNurseZOnPatrol} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint} footworkUnlocks=${Number(data.flags.footworkJumpUnlocked)}${Number(data.flags.footworkPaymentUnlocked)}${Number(data.flags.footworkDonationUnlocked)}`,
-    `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} nurseZDoorTalks=${data.counters.nurseZDoorTalks} mealDeaths=${data.counters.mealDeaths}`,
+    `  flags nameRegistered=${data.flags.nameRegistered} reachedDoorUnlock=${data.flags.reachedDoorUnlock} reachedFootwork=${data.flags.reachedFootwork} heardNurseCShortcutHint=${data.flags.heardNurseCShortcutHint} footworkUnlocks=${Number(data.flags.footworkJumpUnlocked)}${Number(data.flags.footworkPaymentUnlocked)}${Number(data.flags.footworkDonationUnlocked)}`,
+    `  counters deaths=${data.counters.deaths} waterDeaths=${data.counters.waterDeaths} mealDeaths=${data.counters.mealDeaths}`,
     `  deathCauseCounts=${JSON.stringify(data.deathCauseCounts)}`,
     `  rules=${data.rules.join(",") || "(none)"}`,
     `  achievements=${data.achievements.join(",") || "(none)"}`,
@@ -648,6 +641,22 @@ function formatText(message) {
   return String(message)
     .replaceAll("〇〇〇", playerName)
     .replaceAll("〇〇", playerName);
+}
+
+// 本文の一部分だけを、意味を変えずに異様な言葉として強調する。
+function emphasizeTextPhrase(phrase) {
+  const message = text.textContent;
+  const index = message.indexOf(phrase);
+  if (index < 0) return;
+
+  const emphasis = document.createElement("span");
+  emphasis.className = "wavy-emphasis";
+  emphasis.textContent = phrase;
+  text.replaceChildren(
+    document.createTextNode(message.slice(0, index)),
+    emphasis,
+    document.createTextNode(message.slice(index + phrase.length))
+  );
 }
 
 // 選択肢ボタンをまとめて作る。
@@ -867,7 +876,6 @@ function startTitle({ persist = true } = {}) {
   contentWarning.textContent = TEXT.UI.CONTENT_WARNING;
   contentWarning.hidden = false;
   counters.hiddenLoopClicks = 0;
-  flags.loopButtonLocked = false;
   const titleChoices = [
     { label: "はじめる", action: startGame, advancesTime: false },
     { label: "ルール", action: showRules, advancesTime: false }
@@ -951,6 +959,7 @@ function showDebugMenu() {
     { label: "水イベント", action: showWaterEvent },
     { label: "食事イベント", action: showMealEvent },
     { label: "夜イベント", action: showNightPreview },
+    { label: "薬イベント", action: showMedicineEvent },
     { label: "夜のトイレ", action: moveToNightToilet },
     { label: "掃除ループ", action: showCleaningPreview },
     { label: "巡回イベント", action: waitForPatrol },
@@ -961,6 +970,7 @@ function showDebugMenu() {
     { label: "足運びイベント", action: showFootworkEvent },
     { label: "車イベント", action: showCarEvent },
     { label: "第一部完", action: showSoftRoomAfterFin },
+    { label: "ハード監禁室・導入", action: () => goScene("hard.transfer") },
     {
       label: "裏世界・戦争（仮）",
       action: showDebugWarPrototype,
@@ -1045,6 +1055,10 @@ function startGame() {
     showInitialDayIntro();
     return;
   }
+  if (story.chapter === STORY_CHAPTER.HARD_ROOM) {
+    goScene("hard.transfer");
+    return;
+  }
   startLoop();
 }
 
@@ -1103,7 +1117,6 @@ function showInitialDayIntro() {
   hideRulePopup();
   title.textContent = "";
   counters.hiddenLoopClicks = 0;
-  flags.loopButtonLocked = false;
   typeText(TEXT.INITIAL_DAY.INTRO, () => waitForInitialContinue(showInitialNurseZ));
 }
 
@@ -1248,7 +1261,6 @@ const SCENES = {
     hideRulePopup();
     title.textContent = "";
     counters.hiddenLoopClicks = 0;
-    flags.loopButtonLocked = false;
     advanceStoryProgress(STORY.SOFT_ROOM.START);
     typeText(getSoftRoomStartText(), () => goScene("soft.choices"));
   },
@@ -1269,7 +1281,6 @@ const SCENES = {
   "soft.return": () => {
     title.textContent = "";
     counters.hiddenLoopClicks = 0;
-    flags.loopButtonLocked = false;
     typeText(TEXT.SOFT_ROOM.RETURN, () => goScene("soft.choices"));
   },
   "soft.nurseCall": () => {
@@ -1306,28 +1317,34 @@ const SCENES = {
       nurseId = "normal";
     }
     pendingDoorNurse = null;
+
+    const showPaperCupChoices = () => {
+      setChoices([
+        { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
+        { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.return") }
+      ]);
+    };
+
     if (flags.paperCupPlacedThisLoop) {
-      typeText(
-        TEXT.SOFT_ROOM.PAPER_CUP_ALREADY,
-        () => {
-          setChoices([
-            { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
-            { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.return") }
-          ]);
-        }
-      );
+      const previousProviderId = flags.paperCupProviderIdThisLoop;
+      if (previousProviderId === nurseId) {
+        typeText(TEXT.SOFT_ROOM.PAPER_CUP_ALREADY, showPaperCupChoices);
+        return;
+      }
+
+      flags.paperCupProviderIdThisLoop = nurseId;
+      const replacementText = nurseId === "z"
+        ? TEXT.SOFT_ROOM.PAPER_CUP_REPLACED_BY_Z
+        : TEXT.SOFT_ROOM.PAPER_CUP_Z_REMOVED(nurseName);
+      typeText(replacementText, showPaperCupChoices);
       return;
     }
+
     flags.paperCupPlacedThisLoop = true;
     flags.paperCupProviderIdThisLoop = nurseId;
     typeText(
       TEXT.SOFT_ROOM.PAPER_CUP_PLACED(nurseName),
-      () => {
-        setChoices([
-          { label: TEXT.CHOICE.LOOK_PAPER_CUP, action: () => goScene("soft.water") },
-          { label: TEXT.CHOICE.RETURN_WHITE_ROOM, action: () => goScene("soft.return") }
-        ]);
-      }
+      showPaperCupChoices
     );
   },
   "soft.water": () => {
@@ -1348,15 +1365,32 @@ const SCENES = {
     moveTrialClockToToothbrushTime();
     typeText(TEXT.SOFT_ROOM.TOOTHBRUSH_EVENT, showToothbrushChoices);
   },
+  "soft.medicine": () => {
+    const nurseName = getMedicineNurseName();
+    typeText(
+      TEXT.SOFT_ROOM.MEDICINE.ARRIVAL(nurseName),
+      () => showMedicineChoices(nurseName)
+    );
+  },
   "soft.lightsOut": () => {
-    findRule("toiletLight");
-    typeText(TEXT.SOFT_ROOM.LIGHTS_OUT, () => goScene("soft.nightChoices"));
+    if (flags.toiletLightSignaledThisNight) {
+      findRule("toiletLight");
+      typeText(TEXT.SOFT_ROOM.LIGHTS_OUT, () => goScene("soft.nightChoices"));
+      return;
+    }
+    typeText(TEXT.SOFT_ROOM.LIGHTS_OUT_DARK, () => goScene("soft.nightChoices"));
   },
   "soft.nightChoices": () => {
-    setChoices([
-      { label: TEXT.CHOICE.SLEEP_AT_NIGHT, action: sleepAtNight },
-      { label: TEXT.CHOICE.MOVE_TOILET, action: () => goScene("soft.nightToilet") }
-    ]);
+    const nightChoices = [
+      { label: TEXT.CHOICE.SLEEP_AT_NIGHT, action: sleepAtNight }
+    ];
+    if (flags.toiletLightSignaledThisNight) {
+      nightChoices.push({
+        label: TEXT.CHOICE.MOVE_TOILET,
+        action: () => goScene("soft.nightToilet")
+      });
+    }
+    setChoices(nightChoices);
   },
   "soft.nightToilet": () => {
     typeText(
@@ -1427,10 +1461,7 @@ const SCENES = {
     );
   },
   "soft.nurseZMeet": () => {
-    if (!flags.metNurseZOnPatrol) {
-      flags.metNurseZOnPatrol = true;
-      advanceStoryProgress(STORY.SOFT_ROOM.NURSE_Z_ROUTE);
-    }
+    advanceStoryProgress(STORY.SOFT_ROOM.NURSE_Z_ROUTE);
     if (isStoryProgressAtLeast(STORY.SOFT_ROOM.ESCAPE_READY)) {
       goScene("soft.escapeProposal");
       return;
@@ -1629,6 +1660,55 @@ const SCENES = {
   },
   "footwork.complete": () => {
     showCarApproach();
+  },
+
+  // ハード監禁室は新しい章として独立したsceneIdを使う。
+  // 導入では回避手段を与えず、礼儀違反から同じ朝へ強制的に戻す。
+  "hard.transfer": () => {
+    document.body.className = "hard-room";
+    hideRulePopup();
+    title.textContent = "";
+    advanceStoryProgress(STORY.HARD_ROOM.START, STORY_CHAPTER.HARD_ROOM);
+    typeText(
+      TEXT.HARD_ROOM.TRANSFER,
+      () => waitForContinue(() => goScene("hard.corridor"), TEXT.CHOICE.ELLIPSIS)
+    );
+  },
+  "hard.corridor": () => {
+    typeText(
+      TEXT.HARD_ROOM.CORRIDOR,
+      () => waitForContinue(() => goScene("hard.entrance"), TEXT.CHOICE.ELLIPSIS)
+    );
+  },
+  "hard.entrance": () => {
+    advanceStoryProgress(STORY.HARD_ROOM.ENTRANCE_LOOP, STORY_CHAPTER.HARD_ROOM);
+    typeText(
+      TEXT.HARD_ROOM.ENTRANCE,
+      () => {
+        emphasizeTextPhrase("礼儀をもって");
+        waitForContinue(() => goScene("hard.noManners"), TEXT.CHOICE.ELLIPSIS);
+      }
+    );
+  },
+  "hard.noManners": () => {
+    typeText(
+      TEXT.HARD_ROOM.NO_MANNERS,
+      () => waitForContinue(() => goScene("hard.blackout"), TEXT.CHOICE.ELLIPSIS)
+    );
+  },
+  "hard.blackout": () => {
+    document.body.className = "hard-room-blackout";
+    typeText(
+      TEXT.HARD_ROOM.BLACKOUT,
+      () => waitForContinue(() => goScene("hard.restart"), TEXT.CHOICE.ELLIPSIS)
+    );
+  },
+  "hard.restart": () => {
+    document.body.className = "hard-room";
+    typeText(
+      TEXT.HARD_ROOM.RESTART,
+      () => waitForContinue(() => goScene("hard.corridor"), TEXT.CHOICE.ELLIPSIS)
+    );
   }
 };
 
@@ -1689,7 +1769,7 @@ function getNextNurseCallResponder() {
     { id: "z", name: "看護師Z" }
   ];
   counters.nurseCalls++;
-  return nurses[(counters.nurseCalls - 1) % nurses.length];
+  return nurses[Math.floor(Math.random() * nurses.length)];
 }
 
 function continueAfterNurseCShortcutHintOnce(nurse, continuation) {
@@ -1920,9 +2000,57 @@ function showToothbrushEvent() {
 
 function showToothbrushChoices() {
   setChoices([
-    { label: TEXT.CHOICE.PRETEND_NOT_NOTICE, action: () => goScene("soft.lightsOut") },
+    {
+      label: TEXT.CHOICE.PRETEND_NOT_NOTICE,
+      action: () => {
+        flags.toiletLightSignaledThisNight = false;
+        goScene("soft.medicine");
+      }
+    },
     { label: TEXT.CHOICE.ASK_MEANING, action: () => die("NURSE_C_MEANING_ASK") },
-    { label: TEXT.CHOICE.BLINK_BACK, action: () => goScene("soft.lightsOut") }
+    {
+      label: TEXT.CHOICE.BLINK_BACK,
+      action: () => {
+        flags.toiletLightSignaledThisNight = true;
+        goScene("soft.medicine");
+      }
+    }
+  ]);
+}
+
+function getMedicineNurseName() {
+  return trialClock.day % 2 === 0 ? "看護師C" : "看護師A";
+}
+
+function showMedicineEvent() {
+  goScene("soft.medicine");
+}
+
+function showMedicineChoices(nurseName) {
+  setChoices([
+    { label: TEXT.CHOICE.DRINK, action: () => die("MEDICINE"), advancesTime: false },
+    {
+      label: TEXT.CHOICE.DO_NOT_DRINK,
+      advancesTime: false,
+      action: () => typeText(
+        TEXT.SOFT_ROOM.MEDICINE.REFUSE_FIRST(nurseName),
+        () => showMedicineConfirmationChoices(nurseName)
+      )
+    }
+  ]);
+}
+
+function showMedicineConfirmationChoices(nurseName) {
+  setChoices([
+    { label: TEXT.CHOICE.DRINK, action: () => die("MEDICINE"), advancesTime: false },
+    {
+      label: TEXT.CHOICE.DO_NOT_DRINK,
+      advancesTime: false,
+      action: () => typeText(
+        TEXT.SOFT_ROOM.MEDICINE.REFUSE_SECOND(nurseName),
+        () => waitForContinue(() => goScene("soft.lightsOut"))
+      )
+    }
   ]);
 }
 
@@ -2476,6 +2604,7 @@ function showSoftRoomAfterFin() {
 
 function completeWhiteRoom() {
   unlockAchievement("softRoomClear");
+  advanceStoryProgress(STORY.HARD_ROOM.START, STORY_CHAPTER.HARD_ROOM);
   startTitle();
 }
 
@@ -2498,7 +2627,19 @@ function setTrialClockToMorning(day) {
   renderTrialClock();
 }
 
+function dieAtMorning() {
+  findRule("morningDanger");
+  const reason = currentSceneId?.startsWith("footwork.")
+    ? "MORNING_FOOTWORK"
+    : "MORNING_STILL";
+  die(reason);
+}
+
 function showNextDayMorning() {
+  if (trialClock.day >= SOFT_ROOM_CONFIG.deathDay) {
+    dieAtMorning();
+    return;
+  }
   setTrialClockToMorning(trialClock.day);
   typeText(
     TEXT.TRIAL_CLOCK.MORNING_CONTINUE,
@@ -2507,7 +2648,23 @@ function showNextDayMorning() {
 }
 
 function advanceToNextDayBySleeping() {
-  setTrialClockToMorning(trialClock.day + 1);
+  if (
+    currentSceneId === "soft.nightChoices" &&
+    !flags.toiletLightSignaledThisNight
+  ) {
+    findRule("nightIsDangerous");
+    die("SLEEP");
+    return;
+  }
+
+  const nextDay = trialClock.day + 1;
+  if (nextDay >= SOFT_ROOM_CONFIG.deathDay) {
+    setTrialClockToMorning(nextDay);
+    findRule("nightIsDangerous");
+    die("SLEEP");
+    return;
+  }
+  setTrialClockToMorning(nextDay);
   typeText(
     TEXT.TRIAL_CLOCK.SLEEP_TO_NEXT_DAY,
     () => goScene("soft.choices")
@@ -2529,7 +2686,12 @@ function moveTrialClockToToothbrushTime() {
 }
 
 function showMorningWarning() {
-  setTrialClockToMorning(trialClock.day + 1);
+  const nextDay = trialClock.day + 1;
+  if (nextDay >= SOFT_ROOM_CONFIG.deathDay) {
+    dieAtMorning();
+    return;
+  }
+  setTrialClockToMorning(nextDay);
   typeText(
     TEXT.TRIAL_CLOCK.MORNING_CONTINUE,
     () => goScene("soft.choices")
@@ -2620,8 +2782,6 @@ function getHiddenLoopShortcut() {
 }
 
 function handleHiddenLoopButton(button) {
-  if (flags.loopButtonLocked) return;
-
   const shortcut = getHiddenLoopShortcut();
   if (shortcut) {
     findRule("entranceShortcut");
@@ -2631,21 +2791,15 @@ function handleHiddenLoopButton(button) {
     );
     return;
   }
+
   counters.hiddenLoopClicks++;
   if (!button) return;
   if (counters.hiddenLoopClicks < SOFT_ROOM_CONFIG.hiddenLoopClicksToReveal) {
     button.textContent = "4 " + "……".repeat(counters.hiddenLoopClicks + 1);
     return;
   }
-  button.textContent = "4 ループしている？ ……";
-  button.disabled = true;
-  flags.loopButtonLocked = true;
-  setTimeout(() => {
-    button.textContent = "4 ループしている？";
-    button.disabled = false;
-    flags.loopButtonLocked = false;
-    button.onclick = () => die("LOOP_QUESTION");
-  }, SOFT_ROOM_CONFIG.hiddenLoopLockMs);
+  button.textContent = "4 ループしている？";
+  button.onclick = () => die("LOOP_QUESTION");
 }
 
 // 死亡イベント。
@@ -2752,7 +2906,7 @@ function unlockAchievement(id) {
   unlockedAchievementIds.add(id);
   pendingRulePopups.push({
     label: "実績解除",
-    text: achievement.name
+    text: achievement.notificationText || achievement.name
   });
 }
 

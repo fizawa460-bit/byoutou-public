@@ -422,3 +422,27 @@ body.debug-war button {
   color: #eee;
   border-color: #3c4350;
 }
+
+/* ハード監禁室導入の白黒転換。場面切替時だけクラスを入れ替える。 */
+body.hard-room,
+body.hard-room-blackout {
+  transition: background-color 0.7s ease, color 0.7s ease;
+}
+
+body.hard-room-blackout {
+  background: #050505;
+  color: #f2f2f2;
+}
+
+body.hard-room-blackout button {
+  background: #111;
+  color: #f2f2f2;
+  border-color: #555;
+}
+
+.wavy-emphasis {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}

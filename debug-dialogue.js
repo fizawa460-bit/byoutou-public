@@ -35,6 +35,8 @@
         scene("SOFT_ROOM.DOOR_KNOCK", "看護師Aがドアへ来る", () => soft.DOOR_KNOCK({ name: "看護師A" })),
         scene("SOFT_ROOM.PAPER_CUP_PLACED", "紙コップを置く", () => soft.PAPER_CUP_PLACED("看護師A")),
         fixed("SOFT_ROOM.PAPER_CUP_ALREADY", "紙コップ設置済み", soft.PAPER_CUP_ALREADY),
+        fixed("SOFT_ROOM.PAPER_CUP_REPLACED_BY_Z", "Zが通常の水を交換", soft.PAPER_CUP_REPLACED_BY_Z),
+        scene("SOFT_ROOM.PAPER_CUP_Z_REMOVED", "A/CがZの水を交換", () => soft.PAPER_CUP_Z_REMOVED("看護師A")),
         fixed("DEATH.EARLY_NURSE_CALL", "早すぎるナースコール", death.EARLY_NURSE_CALL),
         fixed("DEATH.BROADCAST_REPLY", "放送へ返事する", death.BROADCAST_REPLY),
         fixed("DEATH.TALK_THROUGH_DOOR", "ドア越しに話す", death.TALK_THROUGH_DOOR)
@@ -64,7 +66,13 @@
       label: "消灯・トイレ・巡回",
       scenes: [
         fixed("SOFT_ROOM.TOOTHBRUSH_EVENT", "歯磨き", soft.TOOTHBRUSH_EVENT),
+        scene("SOFT_ROOM.MEDICINE.ARRIVAL", "薬・1日目（看護師A）", () => soft.MEDICINE.ARRIVAL("看護師A")),
+        scene("SOFT_ROOM.MEDICINE.ARRIVAL", "薬・2日目（看護師C）", () => soft.MEDICINE.ARRIVAL("看護師C")),
+        scene("SOFT_ROOM.MEDICINE.REFUSE_FIRST", "薬・1回目の拒否", () => soft.MEDICINE.REFUSE_FIRST("看護師A")),
+        scene("SOFT_ROOM.MEDICINE.REFUSE_SECOND", "薬・2回目の拒否", () => soft.MEDICINE.REFUSE_SECOND("看護師A")),
+        fixed("DEATH.MEDICINE", "薬を飲んで死亡", death.MEDICINE),
         fixed("SOFT_ROOM.LIGHTS_OUT", "消灯", soft.LIGHTS_OUT),
+        fixed("SOFT_ROOM.LIGHTS_OUT_DARK", "消灯・瞬きを返さない", soft.LIGHTS_OUT_DARK),
         fixed("SOFT_ROOM.NIGHT_TOILET_ENTER", "夜のトイレ", soft.NIGHT_TOILET_ENTER),
         fixed("SOFT_ROOM.TOILET_PAPER", "トイレットペーパー", soft.TOILET_PAPER),
         fixed("SOFT_ROOM.CLEANING_PREVIEW", "掃除を始める", soft.CLEANING_PREVIEW),
@@ -78,6 +86,7 @@
         fixed("SOFT_ROOM.NURSE_Z_MEET", "巡回中にZと会う", soft.NURSE_Z_MEET),
         fixed("SOFT_ROOM.MORNING_WARNING", "朝の警告", soft.MORNING_WARNING),
         fixed("DEATH.MORNING_STILL", "朝まで動かない", death.MORNING_STILL),
+        fixed("DEATH.MORNING_FOOTWORK", "足運び中に朝を迎える", death.MORNING_FOOTWORK),
         fixed("DEATH.MORNING_CLEANING", "朝まで掃除する", death.MORNING_CLEANING),
         scene("DEATH.DOOR_WATCHERS", "ドアを見る・初回", () => death.DOOR_WATCHERS(0)),
         scene("DEATH.DOOR_WATCHERS", "ドアを見る・複数", () => death.DOOR_WATCHERS(3))
