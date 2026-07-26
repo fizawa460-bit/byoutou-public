@@ -23,8 +23,8 @@
     railEdge: { name: "端寄せレール", layer: "structure", w: 3, h: 1, draw: drawRailEdge, rotations: [0, 90, 180, 270] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
     doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 90, 180, 270] },
-    mealHatchClosed: { name: "配膳口・閉", layer: "structure", w: 1, h: 1, draw: drawMealHatchClosed, rotations: [0, 90, 180, 270] },
-    mealHatchOpen: { name: "配膳口・開", layer: "structure", w: 1, h: 1, draw: drawMealHatchOpen, rotations: [0, 90, 180, 270] },
+    mealHatchClosed: { name: "配膳口・閉", layer: "fixture", w: 1, h: 1, draw: drawMealHatchClosed, rotations: [0, 90, 180, 270] },
+    mealHatchOpen: { name: "配膳口・開", layer: "fixture", w: 1, h: 1, draw: drawMealHatchOpen, rotations: [0, 90, 180, 270] },
     window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
@@ -2261,7 +2261,7 @@
     const compactW = w * .58;
     const compactH = h * .58;
     x += (w - compactW) / 2;
-    y += (h - compactH) / 2;
+    y += (h - compactH) * .82;
     w = compactW;
     h = compactH;
     drawMealHatchBase(g, x, y, w, h);
@@ -2294,7 +2294,7 @@
     const compactW = w * .58;
     const compactH = h * .58;
     x += (w - compactW) / 2;
-    y += (h - compactH) / 2;
+    y += (h - compactH) * .82;
     w = compactW;
     h = compactH;
     drawMealHatchBase(g, x, y, w, h);
