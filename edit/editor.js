@@ -11,6 +11,8 @@
   const $ = (id) => document.getElementById(id);
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
+  const nurseSprite = new Image();
+  nurseSprite.src = "assets/nurse-demo.svg?v=20260726-1";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -187,12 +189,16 @@
   let selectedWidth = 2;
   let selectedHeight = 3;
   let selectedPlacements = new Set();
+  let nurseWalk = null;
+  let nurseAnimationFrame = 0;
+  let nurseHideTimer = 0;
 
   buildPalette();
   bindControls();
   syncSelectionControls();
   syncFields();
   render();
+  nurseSprite.addEventListener("load", () => render());
 
   function buildPalette() {
     const palette = $("palette");
@@ -245,6 +251,7 @@
     }));
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
+    $("walk-nurse").addEventListener("click", startNurseWalk);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
     $("layer-select").addEventListener("change", (event) => {
       showLayer(event.target.value);
@@ -535,7 +542,56 @@
     }));
     target.restore();
     if (includeGrid) drawGrid(target);
+    if (target === ctx && nurseWalk) drawNurse(target);
     if (target === ctx && selectedPlacements.size) drawSelection(target);
+  }
+
+  function startNurseWalk() {
+    cancelAnimationFrame(nurseAnimationFrame);
+    clearTimeout(nurseHideTimer);
+    const button = $("walk-nurse");
+    button.disabled = true;
+    nurseWalk = {
+      startedAt: performance.now(),
+      duration: Math.max(3200, map.width * 300),
+      progress: 0,
+      frame: 0
+    };
+    setStatus("看護師が最下段を左から右へ歩いています");
+    nurseAnimationFrame = requestAnimationFrame(animateNurseWalk);
+  }
+
+  function animateNurseWalk(now) {
+    if (!nurseWalk) return;
+    const elapsed = now - nurseWalk.startedAt;
+    nurseWalk.progress = Math.min(1, elapsed / nurseWalk.duration);
+    nurseWalk.frame = Math.floor(elapsed / 170) % 3;
+    render();
+    if (nurseWalk.progress < 1) {
+      nurseAnimationFrame = requestAnimationFrame(animateNurseWalk);
+      return;
+    }
+    setStatus("看護師が右端まで歩きました");
+    nurseHideTimer = window.setTimeout(() => {
+      nurseWalk = null;
+      $("walk-nurse").disabled = false;
+      render();
+    }, 450);
+  }
+
+  function drawNurse(target) {
+    if (!nurseWalk || !nurseSprite.complete || !nurseSprite.naturalWidth) return;
+    const cell = getCellSize();
+    const size = cell * .92;
+    const travel = Math.max(0, map.width - 1) * cell;
+    const x = nurseWalk.progress * travel + (cell - size) / 2;
+    const y = (map.height - 1) * cell + (cell - size) / 2;
+    target.save();
+    target.shadowColor = "rgba(0,0,0,.55)";
+    target.shadowBlur = Math.max(3, cell * .08);
+    target.shadowOffsetY = Math.max(2, cell * .04);
+    target.drawImage(nurseSprite, nurseWalk.frame * 64, 0, 64, 64, x, y, size, size);
+    target.restore();
   }
 
   function drawSelection(target) {
@@ -1364,7 +1420,6 @@
   function drawGrime(g, x, y, w, h) { g.save(); for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(38,31,22,${.05 + (i % 3) * .04})`; g.beginPath(); g.arc(x + (i * 23 + 13) % w, y + (i * 17 + 20) % h, 2 + (i % 4) * 2, 0, Math.PI * 2); g.fill(); } g.restore(); }
   function drawShadow(g, x, y, w, h) { const grad = g.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * .7); grad.addColorStop(0, "rgba(0,0,0,.38)"); grad.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = grad; g.fillRect(x, y, w, h); }
 })();
-
 
 
 
