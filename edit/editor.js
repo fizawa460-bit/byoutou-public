@@ -22,7 +22,7 @@
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
     railEdge: { name: "端寄せレール", layer: "structure", w: 3, h: 1, draw: drawRailEdge, rotations: [0, 90, 180, 270] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
-    doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 45, 90, 135] },
+    doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 90, 180, 270] },
     window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
@@ -2120,7 +2120,105 @@
     tile.draw(g, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight, false);
     g.restore();
   }
-  function drawDoor(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 12, y + 7, w - 24, h - 10, "#343536", "#151515", 3); rect(g, x + w * .38, y + 14, w * .24, 12, "#151515", "#9b968d", 2); }
+  function drawDoor(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.65)";
+    g.shadowBlur = Math.max(5, h * .12);
+    g.shadowOffsetY = Math.max(3, h * .06);
+
+    const frame = g.createLinearGradient(x, y, x, y + h);
+    frame.addColorStop(0, "#aaa79e");
+    frame.addColorStop(.18, "#676763");
+    frame.addColorStop(.55, "#3d3f3e");
+    frame.addColorStop(1, "#232525");
+    rect(g, x + w * .025, y + h * .04, w * .95, h * .92, frame, "#171818", Math.max(2, h * .045));
+    g.shadowColor = "transparent";
+
+    const slabX = x + w * .095;
+    const slabY = y + h * .13;
+    const slabW = w * .81;
+    const slabH = h * .77;
+    const steel = g.createLinearGradient(slabX, slabY, slabX + slabW, slabY + slabH);
+    steel.addColorStop(0, "#5d605e");
+    steel.addColorStop(.28, "#454846");
+    steel.addColorStop(.58, "#555856");
+    steel.addColorStop(1, "#303332");
+    rect(g, slabX, slabY, slabW, slabH, steel, "#171918", Math.max(2, h * .04));
+
+    g.fillStyle = "rgba(255,255,255,.13)";
+    g.fillRect(slabX + h * .05, slabY + h * .045, slabW - h * .1, Math.max(2, h * .035));
+    g.fillStyle = "rgba(0,0,0,.18)";
+    g.fillRect(slabX + h * .04, slabY + slabH - h * .07, slabW - h * .08, Math.max(2, h * .035));
+
+    const slotX = x + w * .36;
+    const slotY = y + h * .28;
+    const slotW = w * .28;
+    const slotH = h * .19;
+    rect(g, slotX, slotY, slotW, slotH, "#171a1a", "#a8a69e", Math.max(2, h * .04));
+    const glass = g.createLinearGradient(slotX, slotY, slotX, slotY + slotH);
+    glass.addColorStop(0, "#596264");
+    glass.addColorStop(.42, "#242b2c");
+    glass.addColorStop(1, "#0e1212");
+    rect(g, slotX + h * .055, slotY + h * .05, slotW - h * .11, slotH - h * .1, glass, "#252726", Math.max(1, h * .02));
+    g.fillStyle = "rgba(224,230,224,.22)";
+    g.fillRect(slotX + h * .08, slotY + h * .065, slotW * .48, Math.max(1, h * .018));
+
+    const ventX = x + w * .35;
+    const ventY = y + h * .66;
+    const ventW = w * .3;
+    const ventH = h * .15;
+    rect(g, ventX, ventY, ventW, ventH, "#242725", "#85847d", Math.max(2, h * .03));
+    const slats = 10;
+    for (let i = 0; i < slats; i++) {
+      const px = ventX + ventW * (.08 + i * .084);
+      g.fillStyle = i % 2 ? "#111313" : "#0b0d0d";
+      g.fillRect(px, ventY + ventH * .18, Math.max(1, ventW * .026), ventH * .64);
+      g.fillStyle = "rgba(210,211,204,.16)";
+      g.fillRect(px + Math.max(1, ventW * .026), ventY + ventH * .18, Math.max(1, ventW * .012), ventH * .64);
+    }
+
+    const handleX = x + w * .205;
+    const handleY = y + h * .53;
+    g.strokeStyle = "#b7b6af";
+    g.lineWidth = Math.max(3, h * .065);
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(handleX, handleY - h * .06);
+    g.lineTo(handleX, handleY + h * .06);
+    g.lineTo(handleX + w * .075, handleY + h * .06);
+    g.stroke();
+    g.strokeStyle = "#494b49";
+    g.lineWidth = Math.max(1, h * .022);
+    g.beginPath();
+    g.moveTo(handleX + h * .02, handleY - h * .05);
+    g.lineTo(handleX + h * .02, handleY + h * .045);
+    g.lineTo(handleX + w * .072, handleY + h * .045);
+    g.stroke();
+    g.fillStyle = "#161817";
+    g.beginPath();
+    g.arc(handleX - h * .015, handleY + h * .115, Math.max(2, h * .035), 0, Math.PI * 2);
+    g.fill();
+
+    for (const hy of [.26, .5, .74]) {
+      const hingeX = x + w * .855;
+      const hingeY = y + h * hy;
+      const hinge = g.createLinearGradient(hingeX, hingeY, hingeX + w * .035, hingeY);
+      hinge.addColorStop(0, "#3a3c3a");
+      hinge.addColorStop(.48, "#aaa9a2");
+      hinge.addColorStop(1, "#303230");
+      rect(g, hingeX, hingeY, w * .035, h * .14, hinge, "#202220", Math.max(1, h * .018));
+    }
+
+    g.fillStyle = "rgba(15,16,15,.22)";
+    for (let i = 0; i < 18; i++) {
+      const px = slabX + ((i * 37) % 83) / 83 * slabW;
+      const py = slabY + ((i * 53) % 79) / 79 * slabH;
+      g.beginPath();
+      g.arc(px, py, Math.max(.6, h * .009), 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
   function drawDoorSmall(g, x, y, w, h) {
     g.save();
     g.shadowColor = "rgba(0,0,0,.55)";
