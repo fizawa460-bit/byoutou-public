@@ -3,6 +3,11 @@
 
   const CELL = 64;
   const LAYERS = ["floor", "structure", "fixture", "overlay"];
+  const DEFAULT_APPEARANCE = Object.freeze({
+    hue: 0,
+    brightness: 100,
+    lineWidth: 100
+  });
   const $ = (id) => document.getElementById(id);
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
@@ -33,6 +38,7 @@
     version: 1,
     name: "ハード監禁室ver1.0",
     cellSize: CELL,
+    appearance: { ...DEFAULT_APPEARANCE },
     width: 12,
     height: 14,
     placements: [
@@ -113,14 +119,28 @@
       preview.width = 64;
       preview.height = 64;
       preview.className = "tile-preview";
-      tile.draw(preview.getContext("2d"), 0, 0, 64, 64, true);
       const label = document.createElement("span");
       label.textContent = tile.name;
       button.append(preview, label);
       button.addEventListener("click", () => selectTile(id));
       palette.append(button);
     });
+    renderPalettePreviews();
     selectTile(selectedTile);
+  }
+
+  function renderPalettePreviews() {
+    document.querySelectorAll(".tile-button").forEach((button) => {
+      const tile = tiles[button.dataset.tile];
+      const preview = button.querySelector(".tile-preview");
+      if (!tile || !preview) return;
+      const previewContext = preview.getContext("2d");
+      previewContext.clearRect(0, 0, preview.width, preview.height);
+      previewContext.save();
+      previewContext.filter = appearanceFilter();
+      tile.draw(createAppearanceContext(previewContext), 0, 0, 64, 64, true);
+      previewContext.restore();
+    });
   }
 
   function bindControls() {
@@ -145,6 +165,10 @@
     $("tile-width").addEventListener("change", syncSelectedSize);
     $("tile-height").addEventListener("change", syncSelectedSize);
     $("reset-tile-size").addEventListener("click", resetSelectedSize);
+    ["appearance-hue", "appearance-brightness", "appearance-line-width"].forEach((id) => {
+      $(id).addEventListener("input", updateAppearance);
+    });
+    $("reset-appearance").addEventListener("click", resetAppearance);
     $("show-all-layers").addEventListener("click", showAllLayers);
     $("show-only-active").addEventListener("click", showOnlyActiveLayer);
     document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
@@ -381,9 +405,12 @@
     target.clearRect(0, 0, canvas.width, canvas.height);
     target.fillStyle = "#141414";
     target.fillRect(0, 0, canvas.width, canvas.height);
+    target.save();
+    target.filter = appearanceFilter();
     LAYERS.filter((layer) => visibleLayers.has(layer)).forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => {
       drawPlacement(target, p);
     }));
+    target.restore();
     if (includeGrid) drawGrid(target);
     if (target === ctx && selectedPlacements.size) drawSelection(target);
   }
@@ -413,14 +440,77 @@
     const y = placement.y * cell;
     const baseWidth = size.w * CELL;
     const baseHeight = size.h * CELL;
-    target.save();
-    target.translate(x, y);
-    target.scale(cell / CELL, cell / CELL);
+    const drawingContext = createAppearanceContext(target);
+    drawingContext.save();
+    drawingContext.translate(x, y);
+    drawingContext.scale(cell / CELL, cell / CELL);
     const rotation = Number(placement.rotation || 0);
-    if (placement.tile === "rail") drawRailRotated(target, 0, 0, baseWidth, baseHeight, rotation);
-    else if (Array.isArray(tile.rotations)) drawTileRotated(target, tile, baseWidth, baseHeight, rotation);
-    else tile.draw(target, 0, 0, baseWidth, baseHeight, false);
-    target.restore();
+    if (placement.tile === "rail") drawRailRotated(drawingContext, 0, 0, baseWidth, baseHeight, rotation);
+    else if (Array.isArray(tile.rotations)) drawTileRotated(drawingContext, tile, baseWidth, baseHeight, rotation);
+    else tile.draw(drawingContext, 0, 0, baseWidth, baseHeight, false);
+    drawingContext.restore();
+  }
+
+  function getAppearance() {
+    const source = map.appearance || DEFAULT_APPEARANCE;
+    return {
+      hue: clampNumber(source.hue, -180, 180, DEFAULT_APPEARANCE.hue),
+      brightness: clampNumber(source.brightness, 50, 150, DEFAULT_APPEARANCE.brightness),
+      lineWidth: clampNumber(source.lineWidth, 50, 200, DEFAULT_APPEARANCE.lineWidth)
+    };
+  }
+
+  function appearanceFilter() {
+    const appearance = getAppearance();
+    return `hue-rotate(${appearance.hue}deg) brightness(${appearance.brightness}%)`;
+  }
+
+  function createAppearanceContext(target) {
+    const multiplier = getAppearance().lineWidth / 100;
+    return new Proxy(target, {
+      get(context, property) {
+        const value = context[property];
+        return typeof value === "function" ? value.bind(context) : value;
+      },
+      set(context, property, value) {
+        context[property] = property === "lineWidth" && typeof value === "number"
+          ? value * multiplier
+          : value;
+        return true;
+      }
+    });
+  }
+
+  function updateAppearance() {
+    map.appearance = {
+      hue: Number($("appearance-hue").value),
+      brightness: Number($("appearance-brightness").value),
+      lineWidth: Number($("appearance-line-width").value)
+    };
+    syncAppearanceControls();
+    renderPalettePreviews();
+    render();
+    refreshJson();
+  }
+
+  function resetAppearance() {
+    remember();
+    map.appearance = { ...DEFAULT_APPEARANCE };
+    syncAppearanceControls();
+    renderPalettePreviews();
+    render();
+    refreshJson();
+    setStatus("見た目を標準に戻しました");
+  }
+
+  function syncAppearanceControls() {
+    const appearance = getAppearance();
+    $("appearance-hue").value = appearance.hue;
+    $("appearance-brightness").value = appearance.brightness;
+    $("appearance-line-width").value = appearance.lineWidth;
+    $("appearance-hue-value").textContent = `${appearance.hue}°`;
+    $("appearance-brightness-value").textContent = `${appearance.brightness}%`;
+    $("appearance-line-width-value").textContent = `${appearance.lineWidth}%`;
   }
 
   function drawGrid(target) {
@@ -482,7 +572,7 @@
     const height = clamp(Number($("map-height").value), 6, 40);
     const cellSize = clamp(Number($("cell-size").value), 16, 128);
     const placements = Array.from({ length: width * height }, (_, i) => ({ tile: "floor", x: i % width, y: Math.floor(i / width), layer: "floor" }));
-    replaceMap({ version: 1, name: "新規マップ", cellSize, width, height, placements }, "新規マップを作成しました");
+    replaceMap({ version: 1, name: "新規マップ", cellSize, appearance: { ...DEFAULT_APPEARANCE }, width, height, placements }, "新規マップを作成しました");
   }
   function resizeMap() {
     remember();
@@ -498,6 +588,7 @@
     $("map-width").value = map.width;
     $("map-height").value = map.height;
     $("cell-size").value = getCellSize();
+    syncAppearanceControls();
     refreshJson();
   }
   function refreshJson() { $("json-text").value = formatMapJson(map); }
@@ -524,6 +615,12 @@
     if (!value || !Number.isInteger(value.width) || !Number.isInteger(value.height) || !Array.isArray(value.placements)) throw new Error("マップ形式が正しくありません");
     value.width = clamp(value.width, 6, 40); value.height = clamp(value.height, 6, 40); value.cellSize = clamp(Number(value.cellSize || CELL), 16, 128); value.version = 1;
     value.name = String(value.name || "名称未設定");
+    const appearance = value.appearance || {};
+    value.appearance = {
+      hue: clampNumber(appearance.hue, -180, 180, DEFAULT_APPEARANCE.hue),
+      brightness: clampNumber(appearance.brightness, 50, 150, DEFAULT_APPEARANCE.brightness),
+      lineWidth: clampNumber(appearance.lineWidth, 50, 200, DEFAULT_APPEARANCE.lineWidth)
+    };
     value.placements = value.placements.map((p) => {
       if (p.tile === "railH") return { ...p, tile: "rail", rotation: 0 };
       if (p.tile === "railV") return { ...p, tile: "rail", rotation: 90 };
@@ -544,7 +641,10 @@
     const cell = getCellSize();
     const output = document.createElement("canvas"); output.width = map.width * cell; output.height = map.height * cell;
     const out = output.getContext("2d"); out.fillStyle = "#141414"; out.fillRect(0, 0, output.width, output.height);
+    out.save();
+    out.filter = appearanceFilter();
     LAYERS.filter((layer) => visibleLayers.has(layer)).forEach((layer) => map.placements.filter((p) => p.layer === layer).forEach((p) => drawPlacement(out, p)));
+    out.restore();
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
   }
   function download(blob, filename) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
@@ -552,6 +652,10 @@
   function setStatus(text) { $("status").textContent = text; }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(value || min))); }
+  function clampNumber(value, min, max, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback;
+  }
   function getCellSize() { return clamp(Number(map.cellSize || CELL), 16, 128); }
 
   function rect(g, x, y, w, h, fill, stroke = null, line = 1) { g.fillStyle = fill; g.fillRect(x, y, w, h); if (stroke) { g.strokeStyle = stroke; g.lineWidth = line; g.strokeRect(x + line / 2, y + line / 2, w - line, h - line); } }
