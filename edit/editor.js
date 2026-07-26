@@ -23,12 +23,15 @@
     railEdge: { name: "端寄せレール", layer: "structure", w: 3, h: 1, draw: drawRailEdge, rotations: [0, 90, 180, 270] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
     doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 90, 180, 270] },
+    mealHatchClosed: { name: "配膳口・閉", layer: "structure", w: 1, h: 1, draw: drawMealHatchClosed, rotations: [0, 90, 180, 270] },
+    mealHatchOpen: { name: "配膳口・開", layer: "structure", w: 1, h: 1, draw: drawMealHatchOpen, rotations: [0, 90, 180, 270] },
     window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
     curtain: { name: "横長のカーテン", layer: "fixture", w: 9, h: 1, draw: drawCurtain },
     toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
     sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
+    mealTray: { name: "食事トレー", layer: "fixture", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
     partition: { name: "低い仕切り", layer: "fixture", w: 1, h: 2, draw: drawPartition },
     cabinet: { name: "小設備", layer: "fixture", w: 1, h: 1, draw: drawCabinet },
     grime: { name: "床の汚れ", layer: "overlay", w: 1, h: 1, draw: drawGrime },
@@ -2235,6 +2238,140 @@
     g.fill();
     g.fillStyle = "#70716e";
     g.fillRect(x + w * .08, y + h * .72, w * .84, Math.max(2, h * .045));
+    g.restore();
+  }
+  function drawMealHatchBase(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.55)";
+    g.shadowBlur = Math.max(5, w * .08);
+    g.shadowOffsetY = Math.max(3, h * .05);
+    const frame = g.createLinearGradient(x, y, x + w, y + h);
+    frame.addColorStop(0, "#9d9a92");
+    frame.addColorStop(.28, "#555856");
+    frame.addColorStop(.7, "#343635");
+    frame.addColorStop(1, "#797871");
+    rect(g, x + w * .07, y + h * .08, w * .86, h * .84, frame, "#191b1a", Math.max(2, w * .035));
+    g.shadowColor = "transparent";
+    rect(g, x + w * .14, y + h * .16, w * .72, h * .68, "#313432", "#151716", Math.max(2, w * .026));
+    g.fillStyle = "rgba(255,255,255,.14)";
+    g.fillRect(x + w * .11, y + h * .11, w * .78, Math.max(2, h * .035));
+    g.restore();
+  }
+  function drawMealHatchClosed(g, x, y, w, h) {
+    drawMealHatchBase(g, x, y, w, h);
+    g.save();
+    const panelX = x + w * .18;
+    const panelY = y + h * .2;
+    const panelW = w * .64;
+    const panelH = h * .58;
+    const panel = g.createLinearGradient(panelX, panelY, panelX + panelW, panelY + panelH);
+    panel.addColorStop(0, "#666964");
+    panel.addColorStop(.45, "#424542");
+    panel.addColorStop(1, "#2d302e");
+    rect(g, panelX, panelY, panelW, panelH, panel, "#1a1c1b", Math.max(2, w * .032));
+    g.fillStyle = "rgba(225,225,217,.12)";
+    g.fillRect(panelX + w * .035, panelY + h * .035, panelW - w * .07, Math.max(2, h * .03));
+    g.fillStyle = "#aaa9a1";
+    g.fillRect(x + w * .39, y + h * .68, w * .22, Math.max(3, h * .055));
+    g.fillStyle = "#303230";
+    g.fillRect(x + w * .43, y + h * .69, w * .14, Math.max(1, h * .02));
+    for (const hx of [.22, .72]) {
+      const metal = g.createLinearGradient(x + w * hx, 0, x + w * (hx + .06), 0);
+      metal.addColorStop(0, "#353735");
+      metal.addColorStop(.5, "#aaa9a2");
+      metal.addColorStop(1, "#292b29");
+      rect(g, x + w * hx, y + h * .16, w * .06, h * .12, metal, "#202220", Math.max(1, w * .014));
+    }
+    g.restore();
+  }
+  function drawMealHatchOpen(g, x, y, w, h) {
+    drawMealHatchBase(g, x, y, w, h);
+    g.save();
+    const openingX = x + w * .17;
+    const openingY = y + h * .39;
+    const openingW = w * .66;
+    const openingH = h * .39;
+    const dark = g.createLinearGradient(openingX, openingY, openingX, openingY + openingH);
+    dark.addColorStop(0, "#070909");
+    dark.addColorStop(.55, "#171b1a");
+    dark.addColorStop(1, "#2b2e2c");
+    rect(g, openingX, openingY, openingW, openingH, dark, "#9b9991", Math.max(2, w * .032));
+    g.fillStyle = "rgba(235,233,223,.28)";
+    g.fillRect(openingX + w * .025, openingY + openingH - h * .075, openingW - w * .05, Math.max(3, h * .055));
+
+    g.shadowColor = "rgba(0,0,0,.58)";
+    g.shadowBlur = Math.max(4, w * .065);
+    g.shadowOffsetY = Math.max(2, h * .04);
+    const flap = g.createLinearGradient(x, y + h * .08, x, y + h * .37);
+    flap.addColorStop(0, "#777973");
+    flap.addColorStop(.48, "#484b48");
+    flap.addColorStop(1, "#292c2a");
+    rect(g, x + w * .17, y + h * .12, w * .66, h * .23, flap, "#181a19", Math.max(2, w * .03));
+    g.shadowColor = "transparent";
+    g.fillStyle = "rgba(235,235,226,.16)";
+    g.fillRect(x + w * .21, y + h * .15, w * .58, Math.max(2, h * .028));
+    g.fillStyle = "#9c9b94";
+    g.fillRect(x + w * .24, y + h * .345, w * .52, Math.max(2, h * .04));
+    for (const hx of [.22, .72]) {
+      rect(g, x + w * hx, y + h * .31, w * .06, h * .09, "#74756f", "#242624", Math.max(1, w * .014));
+    }
+    g.restore();
+  }
+  function drawMealTray(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.55)";
+    g.shadowBlur = Math.max(5, w * .08);
+    g.shadowOffsetY = Math.max(3, h * .05);
+    const tray = g.createLinearGradient(x, y, x + w, y + h);
+    tray.addColorStop(0, "#b8ada0");
+    tray.addColorStop(.42, "#847c73");
+    tray.addColorStop(1, "#5b5650");
+    rect(g, x + w * .07, y + h * .14, w * .86, h * .72, tray, "#2d2b29", Math.max(2, w * .035));
+    g.shadowColor = "transparent";
+    rect(g, x + w * .13, y + h * .2, w * .74, h * .6, "#aca398", "#dad3c8", Math.max(1, w * .02));
+
+    g.fillStyle = "#e8e2d6";
+    g.beginPath();
+    g.ellipse(x + w * .34, y + h * .48, w * .17, h * .2, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "#79746d";
+    g.lineWidth = Math.max(1, w * .018);
+    g.stroke();
+    g.fillStyle = "#f2eee4";
+    g.beginPath();
+    g.ellipse(x + w * .34, y + h * .46, w * .12, h * .14, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "rgba(154,145,132,.35)";
+    for (let i = 0; i < 4; i++) {
+      g.beginPath();
+      g.arc(x + w * (.29 + i * .025), y + h * (.43 + (i % 2) * .06), Math.max(1, w * .012), 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    g.fillStyle = "#d9d2c6";
+    g.beginPath();
+    g.ellipse(x + w * .68, y + h * .4, w * .14, h * .16, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "#747069";
+    g.stroke();
+    g.fillStyle = "#75533a";
+    g.beginPath();
+    g.ellipse(x + w * .68, y + h * .41, w * .1, h * .105, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#b4a65c";
+    g.beginPath();
+    g.arc(x + w * .65, y + h * .39, Math.max(2, w * .025), 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#698055";
+    g.beginPath();
+    g.arc(x + w * .71, y + h * .43, Math.max(2, w * .022), 0, Math.PI * 2);
+    g.fill();
+
+    rect(g, x + w * .56, y + h * .62, w * .25, h * .11, "#ded7ca", "#77726a", Math.max(1, w * .016));
+    g.fillStyle = "#ad7048";
+    g.fillRect(x + w * .59, y + h * .65, w * .08, h * .055);
+    g.fillStyle = "#7f925d";
+    g.fillRect(x + w * .69, y + h * .65, w * .08, h * .055);
     g.restore();
   }
   function drawWindow(g, x, y, w, h) {
