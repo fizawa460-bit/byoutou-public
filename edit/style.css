@@ -60,6 +60,7 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
 
 .palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
 .tile-button { display: grid; place-items: center; gap: 5px; min-height: 78px; padding: 7px 4px; font-size: 11px; }
+.tile-button[hidden] { display: none; }
 .tile-preview { width: 42px; height: 42px; image-rendering: auto; }
 
 .editor-panel { min-width: 0; overflow: hidden; }
