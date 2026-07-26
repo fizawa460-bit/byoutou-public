@@ -12,7 +12,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = "assets/nurse-demo.png?v=20260726-2";
+  nurseSprite.src = "assets/nurse-demo.png?v=20260726-3";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
