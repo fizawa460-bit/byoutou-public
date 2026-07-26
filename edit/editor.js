@@ -31,7 +31,7 @@
     curtain: { name: "横長のカーテン", layer: "fixture", w: 9, h: 1, draw: drawCurtain },
     toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
     sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
-    mealTray: { name: "食事トレー", layer: "fixture", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
+    mealTray: { name: "食事トレー", layer: "overlay", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
     partition: { name: "低い仕切り", layer: "fixture", w: 1, h: 2, draw: drawPartition },
     cabinet: { name: "小設備", layer: "fixture", w: 1, h: 1, draw: drawCabinet },
     grime: { name: "床の汚れ", layer: "overlay", w: 1, h: 1, draw: drawGrime },
