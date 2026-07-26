@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>病棟マップエディタ</title>
-  <link rel="stylesheet" href="style.css?v=20260724-3">
+  <link rel="stylesheet" href="style.css?v=20260726-1">
 </head>
 <body>
   <header class="app-header">
@@ -92,6 +92,22 @@
         <label>マスpx<input id="cell-size" type="number" min="16" max="128" step="8" value="64"><span>px</span></label>
         <button id="resize-map" type="button">変更</button>
       </div>
+      <section class="appearance-panel" aria-labelledby="appearance-title">
+        <div class="appearance-heading">
+          <h3 id="appearance-title">見た目調整</h3>
+          <button id="reset-appearance" type="button">標準に戻す</button>
+        </div>
+        <label>色味 <output id="appearance-hue-value" for="appearance-hue">0°</output>
+          <input id="appearance-hue" type="range" min="-180" max="180" step="5" value="0">
+        </label>
+        <label>明るさ <output id="appearance-brightness-value" for="appearance-brightness">100%</output>
+          <input id="appearance-brightness" type="range" min="50" max="150" step="5" value="100">
+        </label>
+        <label>線の太さ <output id="appearance-line-width-value" for="appearance-line-width">100%</output>
+          <input id="appearance-line-width" type="range" min="50" max="200" step="10" value="100">
+        </label>
+        <p class="appearance-note">調整値はJSONとPNG書出しにも反映されます。</p>
+      </section>
       <button id="save-json" type="button">JSON保存</button>
       <button id="open-json" type="button">JSON読込</button>
       <button id="export-png" type="button" class="primary">PNG書出し</button>
@@ -104,6 +120,6 @@
     </aside>
   </main>
 
-  <script src="editor.js?v=20260725-1"></script>
+  <script src="editor.js?v=20260726-1"></script>
 </body>
 </html>

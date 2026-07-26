@@ -89,6 +89,14 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
 .size-fields label { position: relative; }
 .size-fields label span { position: absolute; right: 7px; bottom: 10px; color: #777; pointer-events: none; }
 .size-fields label:has(span) input { padding-right: 27px; }
+.appearance-panel { display: grid; gap: 9px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: #121416; }
+.appearance-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.appearance-heading h3 { margin: 0; font-size: 14px; }
+.appearance-heading button { min-height: 32px; padding: 4px 8px; font-size: 11px; }
+.appearance-panel label { grid-template-columns: 1fr auto; align-items: center; }
+.appearance-panel output { color: var(--text); font-variant-numeric: tabular-nums; }
+.appearance-panel input[type="range"] { grid-column: 1 / -1; min-height: 32px; padding: 0; accent-color: var(--accent); }
+.appearance-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 details { border-top: 1px solid var(--line); padding-top: 10px; }
 summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 ui-monospace, monospace; }
@@ -96,7 +104,7 @@ textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 
 @media (max-width: 980px) {
   .workspace { grid-template-columns: 180px minmax(420px, 1fr); }
   .data-panel { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); }
-  .data-panel h2, .data-panel details { grid-column: 1 / -1; }
+  .data-panel h2, .data-panel details, .data-panel .appearance-panel { grid-column: 1 / -1; }
 }
 
 @media (max-width: 700px) {
@@ -106,7 +114,7 @@ textarea { height: 220px; margin: 10px 0 6px; resize: vertical; font: 11px/1.45 
   .palette-panel { order: 2; }
   .editor-panel { order: 1; }
   .data-panel { order: 3; display: grid; grid-template-columns: 1fr 1fr; }
-  .data-panel h2, .data-panel details, .data-panel label:first-of-type { grid-column: 1 / -1; }
+  .data-panel h2, .data-panel details, .data-panel label:first-of-type, .data-panel .appearance-panel { grid-column: 1 / -1; }
   .data-panel .size-fields { grid-column: 1 / -1; }
   .palette { grid-template-columns: repeat(4, 1fr); }
   .tile-button { min-height: 70px; }
