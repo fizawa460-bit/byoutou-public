@@ -20,6 +20,7 @@
     wallSide: { name: "側壁", layer: "structure", w: 1, h: 1, draw: drawWallSide, rotations: [0, 45, 90, 135] },
     bars: { name: "鉄格子窓", layer: "structure", w: 3, h: 1, draw: drawBars },
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
+    railEdge: { name: "端寄せレール", layer: "structure", w: 3, h: 1, draw: drawRailEdge, rotations: [0, 90, 180, 270] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
     doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 45, 90, 135] },
     window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
@@ -218,13 +219,33 @@
     $("layer-select").value = tiles[id].layer;
     filterPaletteByLayer(tiles[id].layer);
     const canRotate = Array.isArray(tiles[id].rotations);
-    $("rotation-select").disabled = !canRotate;
-    if (!canRotate) selectedRotation = 0;
-    $("rotation-select").value = String(selectedRotation);
+    if (!canRotate || !tiles[id].rotations.includes(selectedRotation)) selectedRotation = 0;
+    syncRotationOptions(tiles[id]);
     if (!preserveSize) resetSelectedSize();
     showLayer(tiles[id].layer);
     document.querySelectorAll(".tile-button").forEach((button) => button.classList.toggle("active", button.dataset.tile === id));
     setStatus(`${tiles[id].name}を選択中`);
+  }
+
+  function syncRotationOptions(tile) {
+    const select = $("rotation-select");
+    const rotations = Array.isArray(tile.rotations) ? tile.rotations : [0];
+    const labels = {
+      0: "横 0°",
+      45: "斜め 45°",
+      90: "縦 90°",
+      135: "斜め 135°",
+      180: "反転 180°",
+      270: "反転 270°"
+    };
+    select.replaceChildren(...rotations.map((rotation) => {
+      const option = document.createElement("option");
+      option.value = String(rotation);
+      option.textContent = labels[rotation] || `${rotation}°`;
+      return option;
+    }));
+    select.disabled = !Array.isArray(tile.rotations);
+    select.value = String(selectedRotation);
   }
 
   function syncSelectedSize() {
@@ -407,7 +428,7 @@
     if (!tile) return { w: 1, h: 1 };
     if (!Array.isArray(tile.rotations) || rotation === 0) return { w: tile.w, h: tile.h };
     if (tile.w === tile.h) return { w: tile.w, h: tile.h };
-    if (rotation === 90) return { w: tile.h, h: tile.w };
+    if (rotation === 90 || rotation === 270) return { w: tile.h, h: tile.w };
     if (rotation === 45 || rotation === 135) {
       const span = Math.max(1, Math.ceil((tile.w + tile.h) / Math.SQRT2));
       return { w: span, h: span };
@@ -702,6 +723,14 @@
   function drawWallSide(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x + w, y); grad.addColorStop(0, "#302f2e"); grad.addColorStop(.5, "#77736c"); grad.addColorStop(1, "#3a3937"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(x + 8, y + 3, 5, h - 6); }
   function drawBars(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 8, y + 10, w - 16, h - 18, "#171819", "#aaa49a", 3); for (let i = 0; i < 8; i++) { const bx = x + 19 + i * ((w - 38) / 7); g.fillStyle = "#c8c7c1"; g.fillRect(bx - 3, y + 15, 6, h - 28); g.fillStyle = "#4a4b4c"; g.fillRect(bx + 2, y + 15, 3, h - 28); } }
   function drawRailH(g, x, y, w, h) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x + 7, y + h * .54, w - 14, 8); g.fillStyle = "#dedbd2"; g.fillRect(x + 6, y + h * .45, w - 12, 6); g.fillStyle = "#6b6964"; g.fillRect(x + 6, y + h * .45 + 6, w - 12, 3); }
+  function drawRailEdge(g, x, y, w) {
+    g.fillStyle = "rgba(0,0,0,.22)";
+    g.fillRect(x + 7, y + 7, w - 14, 8);
+    g.fillStyle = "#dedbd2";
+    g.fillRect(x + 6, y + 1, w - 12, 6);
+    g.fillStyle = "#6b6964";
+    g.fillRect(x + 6, y + 7, w - 12, 3);
+  }
   function drawRailV(g, x, y, w, h) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x + w * .54, y + 7, 8, h - 14); g.fillStyle = "#dedbd2"; g.fillRect(x + w * .45, y + 6, 6, h - 12); g.fillStyle = "#6b6964"; g.fillRect(x + w * .45 + 6, y + 6, 3, h - 12); }
   function drawRailRotated(g, x, y, w, h, rotation) {
     if (rotation === 0) return drawRailH(g, x, y, w, h);
