@@ -2173,7 +2173,120 @@
       g.stroke();
     }
   }
-  function drawFuton(g, x, y, w, h) { g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 9; g.shadowOffsetY = 5; rect(g, x + 12, y + 8, w - 24, h - 16, "#c8c3b8", "#5c5953", 3); g.shadowColor = "transparent"; rect(g, x + 18, y + 14, w - 36, h * .27, "#ddd8cd", "#7d7971", 2); g.strokeStyle = "rgba(104,99,91,.28)"; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x + 20, y + h * .38 + i * 14); g.quadraticCurveTo(x + w * .5, y + h * .34 + i * 15, x + w - 20, y + h * .39 + i * 14); g.stroke(); } g.restore(); }
+  function drawFuton(g, x, y, w, h) {
+    const insetX = Math.max(5, w * .085);
+    const insetY = Math.max(4, h * .035);
+    const left = x + insetX;
+    const top = y + insetY;
+    const bedW = w - insetX * 2;
+    const bedH = h - insetY * 2;
+    const radius = Math.max(5, Math.min(bedW, bedH) * .06);
+    const rounded = (rx, ry, rw, rh, rr) => {
+      const r = Math.min(rr, rw / 2, rh / 2);
+      g.beginPath();
+      g.moveTo(rx + r, ry);
+      g.arcTo(rx + rw, ry, rx + rw, ry + rh, r);
+      g.arcTo(rx + rw, ry + rh, rx, ry + rh, r);
+      g.arcTo(rx, ry + rh, rx, ry, r);
+      g.arcTo(rx, ry, rx + rw, ry, r);
+      g.closePath();
+    };
+
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.62)";
+    g.shadowBlur = Math.max(8, w * .09);
+    g.shadowOffsetX = Math.max(2, w * .025);
+    g.shadowOffsetY = Math.max(4, h * .035);
+
+    const mattress = g.createLinearGradient(left, top, left + bedW, top + bedH);
+    mattress.addColorStop(0, "#6f8065");
+    mattress.addColorStop(.28, "#87947a");
+    mattress.addColorStop(.62, "#66745d");
+    mattress.addColorStop(1, "#4b5845");
+    rounded(left, top, bedW, bedH, radius);
+    g.fillStyle = mattress;
+    g.fill();
+    g.strokeStyle = "#30392c";
+    g.lineWidth = Math.max(2, w * .018);
+    g.stroke();
+    g.shadowColor = "transparent";
+
+    g.strokeStyle = "rgba(218,226,207,.22)";
+    g.lineWidth = Math.max(1, w * .009);
+    rounded(left + bedW * .055, top + bedH * .035, bedW * .89, bedH * .93, radius * .65);
+    g.stroke();
+    for (let i = 1; i < 5; i++) {
+      const sy = top + bedH * i / 5;
+      g.strokeStyle = i % 2 ? "rgba(32,43,29,.2)" : "rgba(220,228,211,.13)";
+      g.beginPath();
+      g.moveTo(left + bedW * .08, sy);
+      g.bezierCurveTo(left + bedW * .3, sy - bedH * .025, left + bedW * .7, sy + bedH * .025, left + bedW * .92, sy);
+      g.stroke();
+    }
+
+    const blanketX = left + bedW * .06;
+    const blanketY = top + bedH * .31;
+    const blanketW = bedW * .88;
+    const blanketH = bedH * .64;
+    const blanket = g.createLinearGradient(blanketX, blanketY, blanketX + blanketW, blanketY + blanketH);
+    blanket.addColorStop(0, "#d7d3c8");
+    blanket.addColorStop(.38, "#bbb8ae");
+    blanket.addColorStop(.72, "#d1cdc2");
+    blanket.addColorStop(1, "#9c9a92");
+    rounded(blanketX, blanketY, blanketW, blanketH, radius * .75);
+    g.fillStyle = blanket;
+    g.fill();
+    g.strokeStyle = "#6f6d67";
+    g.lineWidth = Math.max(1.5, w * .014);
+    g.stroke();
+
+    g.lineCap = "round";
+    g.lineWidth = Math.max(1, w * .009);
+    for (let i = 0; i < 7; i++) {
+      const sy = blanketY + blanketH * (.12 + i * .12);
+      const offset = i % 2 ? blanketH * .018 : -blanketH * .014;
+      g.strokeStyle = i % 3 === 0 ? "rgba(90,87,81,.3)" : "rgba(245,241,231,.28)";
+      g.beginPath();
+      g.moveTo(blanketX + blanketW * .08, sy);
+      g.bezierCurveTo(blanketX + blanketW * .28, sy + offset, blanketX + blanketW * .46, sy - offset, blanketX + blanketW * .62, sy);
+      g.bezierCurveTo(blanketX + blanketW * .76, sy + offset, blanketX + blanketW * .84, sy - offset, blanketX + blanketW * .92, sy);
+      g.stroke();
+    }
+    g.strokeStyle = "rgba(78,75,70,.24)";
+    g.beginPath();
+    g.moveTo(blanketX + blanketW * .22, blanketY + blanketH * .08);
+    g.bezierCurveTo(blanketX + blanketW * .17, blanketY + blanketH * .36, blanketX + blanketW * .32, blanketY + blanketH * .62, blanketX + blanketW * .25, blanketY + blanketH * .93);
+    g.moveTo(blanketX + blanketW * .73, blanketY + blanketH * .06);
+    g.bezierCurveTo(blanketX + blanketW * .81, blanketY + blanketH * .33, blanketX + blanketW * .68, blanketY + blanketH * .64, blanketX + blanketW * .77, blanketY + blanketH * .92);
+    g.stroke();
+
+    const pillowX = left + bedW * .13;
+    const pillowY = top + bedH * .055;
+    const pillowW = bedW * .74;
+    const pillowH = bedH * .245;
+    const pillow = g.createRadialGradient(
+      pillowX + pillowW * .44, pillowY + pillowH * .38, 1,
+      pillowX + pillowW * .5, pillowY + pillowH * .5, pillowW * .62
+    );
+    pillow.addColorStop(0, "#eeebe2");
+    pillow.addColorStop(.58, "#cbc7bc");
+    pillow.addColorStop(1, "#99968e");
+    rounded(pillowX, pillowY, pillowW, pillowH, radius);
+    g.fillStyle = pillow;
+    g.fill();
+    g.strokeStyle = "#77746d";
+    g.lineWidth = Math.max(1.5, w * .014);
+    g.stroke();
+    rounded(pillowX + pillowW * .075, pillowY + pillowH * .13, pillowW * .85, pillowH * .72, radius * .65);
+    g.strokeStyle = "rgba(100,97,90,.3)";
+    g.lineWidth = Math.max(1, w * .008);
+    g.stroke();
+
+    g.fillStyle = "rgba(255,255,255,.08)";
+    rounded(left + bedW * .08, top + bedH * .025, bedW * .84, bedH * .035, radius * .3);
+    g.fill();
+    g.restore();
+  }
   function drawTable(g, x, y, w, h) { g.save(); g.shadowColor = "#111"; g.shadowBlur = 8; g.shadowOffsetX = 4; rect(g, x + 10, y + 5, w - 20, h - 10, "#5a3d22", "#26190e", 3); g.strokeStyle = "rgba(219,166,102,.28)"; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(x + 14 + i * 9, y + 9); g.lineTo(x + 14 + i * 9, y + h - 9); g.stroke(); } g.restore(); }
   function drawToilet(g, x, y, w, h) {
     g.save();
