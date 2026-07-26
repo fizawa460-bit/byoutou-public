@@ -2258,6 +2258,12 @@
     g.restore();
   }
   function drawMealHatchClosed(g, x, y, w, h) {
+    const compactW = w * .58;
+    const compactH = h * .58;
+    x += (w - compactW) / 2;
+    y += (h - compactH) / 2;
+    w = compactW;
+    h = compactH;
     drawMealHatchBase(g, x, y, w, h);
     g.save();
     const panelX = x + w * .18;
@@ -2285,6 +2291,12 @@
     g.restore();
   }
   function drawMealHatchOpen(g, x, y, w, h) {
+    const compactW = w * .58;
+    const compactH = h * .58;
+    x += (w - compactW) / 2;
+    y += (h - compactH) / 2;
+    w = compactW;
+    h = compactH;
     drawMealHatchBase(g, x, y, w, h);
     g.save();
     const openingX = x + w * .17;
