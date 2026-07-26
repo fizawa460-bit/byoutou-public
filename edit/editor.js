@@ -484,6 +484,7 @@
     drawingContext.scale(cell / CELL, cell / CELL);
     const rotation = Number(placement.rotation || 0);
     if (placement.tile === "rail") drawRailRotated(drawingContext, 0, 0, baseWidth, baseHeight, rotation);
+    else if (placement.tile === "railEdge") drawRailEdgeRotated(drawingContext, 0, 0, baseWidth, baseHeight, rotation);
     else if (Array.isArray(tile.rotations)) drawTileRotated(drawingContext, tile, baseWidth, baseHeight, rotation);
     else tile.draw(drawingContext, 0, 0, baseWidth, baseHeight, false);
     drawingContext.restore();
@@ -724,12 +725,29 @@
   function drawBars(g, x, y, w, h) { drawWallTop(g, x, y, w, h); rect(g, x + 8, y + 10, w - 16, h - 18, "#171819", "#aaa49a", 3); for (let i = 0; i < 8; i++) { const bx = x + 19 + i * ((w - 38) / 7); g.fillStyle = "#c8c7c1"; g.fillRect(bx - 3, y + 15, 6, h - 28); g.fillStyle = "#4a4b4c"; g.fillRect(bx + 2, y + 15, 3, h - 28); } }
   function drawRailH(g, x, y, w, h) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x + 7, y + h * .54, w - 14, 8); g.fillStyle = "#dedbd2"; g.fillRect(x + 6, y + h * .45, w - 12, 6); g.fillStyle = "#6b6964"; g.fillRect(x + 6, y + h * .45 + 6, w - 12, 3); }
   function drawRailEdge(g, x, y, w) {
+    drawRailEdgeHorizontal(g, x, y, w, 1);
+  }
+  function drawRailEdgeHorizontal(g, x, y, w, railY) {
     g.fillStyle = "rgba(0,0,0,.22)";
-    g.fillRect(x + 7, y + 7, w - 14, 8);
+    g.fillRect(x + 7, railY + 6, w - 14, 8);
     g.fillStyle = "#dedbd2";
-    g.fillRect(x + 6, y + 1, w - 12, 6);
+    g.fillRect(x + 6, railY, w - 12, 6);
     g.fillStyle = "#6b6964";
-    g.fillRect(x + 6, y + 7, w - 12, 3);
+    g.fillRect(x + 6, railY + 6, w - 12, 3);
+  }
+  function drawRailEdgeVertical(g, x, y, h, railX, faceLeft) {
+    g.fillStyle = "rgba(0,0,0,.22)";
+    g.fillRect(railX + (faceLeft ? 6 : -5), y + 7, 8, h - 14);
+    g.fillStyle = "#dedbd2";
+    g.fillRect(railX, y + 6, 6, h - 12);
+    g.fillStyle = "#6b6964";
+    g.fillRect(railX + 6, y + 6, 3, h - 12);
+  }
+  function drawRailEdgeRotated(g, x, y, w, h, rotation) {
+    if (rotation === 90) return drawRailEdgeVertical(g, x, y, h, x + w - 10, false);
+    if (rotation === 180) return drawRailEdgeHorizontal(g, x, y, w, y + h - 10);
+    if (rotation === 270) return drawRailEdgeVertical(g, x, y, h, x + 1, true);
+    return drawRailEdgeHorizontal(g, x, y, w, y + 1);
   }
   function drawRailV(g, x, y, w, h) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x + w * .54, y + 7, 8, h - 14); g.fillStyle = "#dedbd2"; g.fillRect(x + w * .45, y + 6, 6, h - 12); g.fillStyle = "#6b6964"; g.fillRect(x + w * .45 + 6, y + 6, 3, h - 12); }
   function drawRailRotated(g, x, y, w, h, rotation) {
