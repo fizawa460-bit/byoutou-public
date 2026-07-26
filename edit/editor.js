@@ -12,7 +12,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-1";
+  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-2";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -198,7 +198,7 @@
   syncSelectionControls();
   syncFields();
   render();
-  nurseSprite.addEventListener("load", () => render());
+  syncNurseButton();\n  nurseSprite.addEventListener("load", () => {\n    syncNurseButton();\n    render();\n  });\n  nurseSprite.addEventListener("error", () => {\n    syncNurseButton();\n    setStatus("看護師画像を読み込めませんでした。再読み込みしてください");\n  });
 
   function buildPalette() {
     const palette = $("palette");
