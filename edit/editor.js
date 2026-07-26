@@ -12,7 +12,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = "assets/nurse-demo.png?v=20260726-3";
+  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-1";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -565,7 +565,7 @@
     if (!nurseWalk) return;
     const elapsed = now - nurseWalk.startedAt;
     nurseWalk.progress = Math.min(1, elapsed / nurseWalk.duration);
-    nurseWalk.frame = Math.floor(elapsed / 170) % 3;
+    nurseWalk.frame = Math.floor(elapsed / 120) % 6;
     render();
     if (nurseWalk.progress < 1) {
       nurseAnimationFrame = requestAnimationFrame(animateNurseWalk);
