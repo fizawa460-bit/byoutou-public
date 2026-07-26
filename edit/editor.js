@@ -12,7 +12,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-2";
+  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-1";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -198,7 +198,6 @@
   syncSelectionControls();
   syncFields();
   render();
-  syncNurseButton();\n  nurseSprite.addEventListener("load", () => {\n    syncNurseButton();\n    render();\n  });\n  nurseSprite.addEventListener("error", () => {\n    syncNurseButton();\n    setStatus("看護師画像を読み込めませんでした。再読み込みしてください");\n  });
 
   function buildPalette() {
     const palette = $("palette");
@@ -1420,6 +1419,3 @@
   function drawGrime(g, x, y, w, h) { g.save(); for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(38,31,22,${.05 + (i % 3) * .04})`; g.beginPath(); g.arc(x + (i * 23 + 13) % w, y + (i * 17 + 20) % h, 2 + (i % 4) * 2, 0, Math.PI * 2); g.fill(); } g.restore(); }
   function drawShadow(g, x, y, w, h) { const grad = g.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * .7); grad.addColorStop(0, "rgba(0,0,0,.38)"); grad.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = grad; g.fillRect(x, y, w, h); }
 })();
-
-
-
