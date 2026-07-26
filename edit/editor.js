@@ -160,7 +160,11 @@
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
-    $("layer-select").addEventListener("change", (event) => { showLayer(event.target.value); setStatus(`${layerName(event.target.value)}を編集中`); });
+    $("layer-select").addEventListener("change", (event) => {
+      showLayer(event.target.value);
+      filterPaletteByLayer(event.target.value);
+      setStatus(`${layerName(event.target.value)}を編集中`);
+    });
     $("rotation-select").addEventListener("change", (event) => { selectedRotation = Number(event.target.value); resetSelectedSize(); setStatus(`${tiles[selectedTile].name}の向き：${selectedRotation}°`); });
     $("tile-width").addEventListener("change", syncSelectedSize);
     $("tile-height").addEventListener("change", syncSelectedSize);
@@ -196,10 +200,23 @@
     });
   }
 
+  function filterPaletteByLayer(layer) {
+    let firstVisibleTile = null;
+    document.querySelectorAll(".tile-button").forEach((button) => {
+      const visible = tiles[button.dataset.tile].layer === layer;
+      button.hidden = !visible;
+      if (visible && !firstVisibleTile) firstVisibleTile = button.dataset.tile;
+    });
+    if (tiles[selectedTile].layer !== layer && firstVisibleTile) {
+      selectTile(firstVisibleTile);
+    }
+  }
+
   function selectTile(id, preserveSize = false) {
     selectedTile = id;
     setMode("paint");
     $("layer-select").value = tiles[id].layer;
+    filterPaletteByLayer(tiles[id].layer);
     const canRotate = Array.isArray(tiles[id].rotations);
     $("rotation-select").disabled = !canRotate;
     if (!canRotate) selectedRotation = 0;
