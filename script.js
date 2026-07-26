@@ -15,7 +15,9 @@ const TRIAL_CLOCK_CONFIG = {
   startMinute: 0,
   morningHour: 6,
   toothbrushHour: 20,
-  minutesPerAction: 30
+  minutesPerAction: 30,
+  doorUnlockMinutesPerAction: 15,
+  footworkMinutesPerAction: 5
 };
 
 // 物語上の意味を持ち、複数箇所で共有する数値だけを定数化する。
@@ -169,7 +171,11 @@ const doorUnlock = {
 
 // 足運びイベント用。
 const footwork = {
-  step: 0
+  step: 0,
+  entryDay: 1,
+  entryHour: TRIAL_CLOCK_CONFIG.startHour,
+  entryMinute: TRIAL_CLOCK_CONFIG.startMinute,
+  entryLastMorningHandledDay: 1
 };
 
 const FOOTWORK_RHYTHM_CONFIG = {
@@ -272,10 +278,20 @@ function stopTrialClock() {
   renderTrialClock();
 }
 
+function getMinutesPerAction() {
+  if (currentSceneId?.startsWith("door.")) {
+    return TRIAL_CLOCK_CONFIG.doorUnlockMinutesPerAction;
+  }
+  if (currentSceneId?.startsWith("footwork.")) {
+    return TRIAL_CLOCK_CONFIG.footworkMinutesPerAction;
+  }
+  return TRIAL_CLOCK_CONFIG.minutesPerAction;
+}
+
 function advanceTrialClock() {
   if (!TRIAL_CLOCK_CONFIG.enabled || !trialClock.active) return true;
 
-  trialClock.minute += TRIAL_CLOCK_CONFIG.minutesPerAction;
+  trialClock.minute += getMinutesPerAction();
   while (trialClock.minute >= 60) {
     trialClock.minute -= 60;
     trialClock.hour++;
@@ -1605,6 +1621,10 @@ const SCENES = {
   },
   "footwork.start": () => {
     footwork.step = 0;
+    footwork.entryDay = trialClock.day;
+    footwork.entryHour = trialClock.hour;
+    footwork.entryMinute = trialClock.minute;
+    footwork.entryLastMorningHandledDay = trialClock.lastMorningHandledDay;
     clearFootworkRhythm();
     typeText(
       TEXT.SOFT_ROOM.FOOTWORK_START,
@@ -1984,7 +2004,7 @@ function showMealChoices() {
 }
 
 function refuseMeal() {
-  typeText(TEXT.SOFT_ROOM.MEAL.REFUSE, () => waitForContinue(() => goScene("soft.return")));
+  typeText(TEXT.SOFT_ROOM.MEAL.REFUSE, () => waitForContinue(() => goScene("soft.nightPreview")));
 }
 
 // 夜イベントの入口。
@@ -2064,9 +2084,10 @@ function showNightChoices() {
   goScene("soft.nightChoices");
 }
 
-// 寝ると日を進め、翌朝9時から白い病室を再開する。
+// 消灯後に眠ると、トイレの明かりの有無にかかわらず死亡する。
 function sleepAtNight() {
-  advanceToNextDayBySleeping();
+  findRule("nightIsDangerous");
+  die("SLEEP");
 }
 
 // 夜のトイレイベント入口。
@@ -2247,6 +2268,12 @@ function failFootworkDuringWait() {
   rewindFootworkAndContinue();
 }
 
+function rewindFootworkAndContinue() {
+  clearFootworkRhythm();
+  footwork.step = Math.max(0, footwork.step - 1);
+  goScene("footwork.choices");
+}
+
 function handleFootworkInput(input) {
   goScene("footwork.input", { input });
 }
@@ -2401,12 +2428,6 @@ function handleLockedFootworkSpecial(expected) {
   );
 }
 
-function rewindFootworkAndContinue() {
-  clearFootworkRhythm();
-  footwork.step = Math.max(0, footwork.step - 1);
-  goScene("footwork.choices");
-}
-
 function advanceFootworkStep(expected) {
   clearFootworkRhythm();
   footwork.step++;
@@ -2429,8 +2450,12 @@ function handleFootworkRhythmTimeout(expected) {
     advanceFootworkStep(expected);
     return;
   }
-  if (isFootworkSpecial(expected) && !isFootworkSpecialUnlocked(expected)) {
-    handleLockedFootworkSpecial(expected);
+  if (isFootworkSpecial(expected)) {
+    if (!isFootworkSpecialUnlocked(expected)) {
+      handleLockedFootworkSpecial(expected);
+      return;
+    }
+    die({ type: "FOOTWORK_FAIL", expected });
     return;
   }
   rewindFootworkAndContinue();
@@ -2439,8 +2464,17 @@ function handleFootworkRhythmTimeout(expected) {
 function handleFootworkRhythmInput(input) {
   const expected = footworkRoute[footwork.step];
 
-  if (isFootworkSpecial(expected) && !isFootworkSpecialUnlocked(expected)) {
-    handleLockedFootworkSpecial(expected);
+  if (isFootworkSpecial(expected)) {
+    if (!isFootworkSpecialUnlocked(expected)) {
+      handleLockedFootworkSpecial(expected);
+      return;
+    }
+    if (input !== expected) {
+      clearFootworkRhythm();
+      die({ type: "FOOTWORK_FAIL", expected });
+      return;
+    }
+    advanceFootworkStep(expected);
     return;
   }
   if (expected === "wait" || input !== expected) {
@@ -2648,15 +2682,6 @@ function showNextDayMorning() {
 }
 
 function advanceToNextDayBySleeping() {
-  if (
-    currentSceneId === "soft.nightChoices" &&
-    !flags.toiletLightSignaledThisNight
-  ) {
-    findRule("nightIsDangerous");
-    die("SLEEP");
-    return;
-  }
-
   const nextDay = trialClock.day + 1;
   if (nextDay >= SOFT_ROOM_CONFIG.deathDay) {
     setTrialClockToMorning(nextDay);
@@ -2746,6 +2771,9 @@ function resolveDeath(reason) {
       } else if (reason.expected === "7") {
         causeId = "FOOTWORK_DONATE_FAIL";
         message = TEXT.DEATH.FOOTWORK_DONATE_FAIL;
+      } else if (reason.expected === "wait") {
+        causeId = "FOOTWORK_WAIT_FAIL";
+        message = TEXT.DEATH.FOOTWORK_WAIT_FAIL;
       } else {
         causeId = "FOOTWORK_TOUCH";
         message = TEXT.DEATH.FOOTWORK_TOUCH;
@@ -2850,10 +2878,24 @@ function performDeath(death, { beforeDeath = null, showWarning = false } = {}) {
     ? `${TEXT.UI.DANGER_SENSE_WARNING}\n\n${deathMessage}`
     : deathMessage;
 
+  const canRestartFootwork = [
+    "FOOTWORK_JUMP_FAIL",
+    "FOOTWORK_PAY_FAIL",
+    "FOOTWORK_DONATE_FAIL",
+    "MORNING_FOOTWORK"
+  ].includes(death.causeId);
+
   typeText(message, () => {
-    setChoices([
-      { label: "タイトルへ戻る", action: nextLoop }
-    ]);
+    const deathChoices = [
+      { label: TEXT.CHOICE.RETURN_TITLE, action: nextLoop }
+    ];
+    if (canRestartFootwork) {
+      deathChoices.unshift({
+        label: TEXT.CHOICE.RESTART_FOOTWORK,
+        action: restartFootworkAfterDeath
+      });
+    }
+    setChoices(deathChoices);
   });
 }
 
@@ -2945,15 +2987,39 @@ function hideRulePopup() {
   rulePopup.classList.remove("show");
 }
 
-// 死亡後にタイトルへ戻る。
-// ここで死亡回数を増やしてから、タイトルへ戻す。
-function nextLoop() {
+function finalizeDeathLoopState() {
   counters.deaths++;
   counters.nurseZDoorTalks = 0;
   if (story.chapter === STORY_CHAPTER.SOFT_ROOM) {
     story.progress = Math.min(story.progress, STORY.SOFT_ROOM.NURSE_Z_ROUTE);
   }
   resetDailySceneState();
+}
+
+function restartFootworkAfterDeath() {
+  const entryClock = {
+    day: footwork.entryDay,
+    hour: footwork.entryHour,
+    minute: footwork.entryMinute,
+    lastMorningHandledDay: footwork.entryLastMorningHandledDay
+  };
+
+  finalizeDeathLoopState();
+  writeSave(saveMode);
+  trialClock.active = TRIAL_CLOCK_CONFIG.enabled;
+  trialClock.day = entryClock.day;
+  trialClock.hour = entryClock.hour;
+  trialClock.minute = entryClock.minute;
+  trialClock.lastMorningHandledDay = entryClock.lastMorningHandledDay;
+  renderTrialClock();
+  document.body.className = "";
+  showFootworkEvent();
+  showQueuedRulePopup();
+}
+
+// 死亡後にタイトルへ戻る。
+function nextLoop() {
+  finalizeDeathLoopState();
   startTitle();
 }
 
