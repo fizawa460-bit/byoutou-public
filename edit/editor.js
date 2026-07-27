@@ -822,12 +822,12 @@
       const roomHeight = Math.max(0, (map.height - 1) * cell - roomTop);
       target.save();
       target.globalCompositeOperation = "screen";
-      target.fillStyle = `rgba(244, 237, 214, ${(.38 * roomLight).toFixed(3)})`;
+      target.fillStyle = `rgba(244, 237, 214, ${(.24 * roomLight).toFixed(3)})`;
       target.fillRect(roomLeft, roomTop, roomWidth, roomHeight);
       target.restore();
     }
 
-    const corridorSpill = smoothLightingStep(18, 18.5, hour);
+    const corridorSpill = smoothLightingStep(17.5, 18, hour);
     if (corridorSpill <= 0) return;
 
     target.save();
@@ -839,7 +839,7 @@
       const barTop = placement.y * cell;
       const lightTop = Math.max(0, barTop - cell * 2.25);
       const gradient = target.createLinearGradient(0, barTop, 0, lightTop);
-      gradient.addColorStop(0, `rgba(244, 237, 214, ${(.34 * corridorSpill).toFixed(3)})`);
+      gradient.addColorStop(0, `rgba(244, 237, 214, ${(.22 * corridorSpill).toFixed(3)})`);
       gradient.addColorStop(1, "rgba(244, 237, 214, 0)");
       target.fillStyle = gradient;
       barsLightGaps(left, width, cell).forEach((gap) => {
