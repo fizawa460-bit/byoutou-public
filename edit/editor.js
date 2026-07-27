@@ -747,6 +747,18 @@
     return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   }
 
+  function sunlightLengthAtHour(hour) {
+    if (hour <= 7) return 1;
+    if (hour <= 12) return curvedMix(1, .5, (hour - 7) / 5);
+    if (hour <= 17) return curvedMix(.5, 2, (hour - 12) / 5);
+    return 2;
+  }
+
+  function curvedMix(from, to, progress) {
+    const eased = (1 - Math.cos(Math.PI * progress)) / 2;
+    return from + (to - from) * eased;
+  }
+
   function drawTimePreview(target) {
     const hour = previewTimeMinutes / 60;
     const daylight = hour <= 5 || hour >= 19
@@ -767,7 +779,8 @@
       const blue = Math.round(194 - 82 * warmth);
       const lightColor = `${red}, ${green}, ${blue}`;
       const shift = -((hour - 5) / 14 - .5) * cell * 5;
-      const depth = cell * (3.5 + daylight * 3) * sunlightLength / 100;
+      const automaticLength = sunlightLengthAtHour(hour);
+      const depth = cell * 6 * automaticLength * sunlightLength / 100;
 
       map.placements.filter((placement) => placement.tile === "window").forEach((placement) => {
         const size = footprint(placement);
