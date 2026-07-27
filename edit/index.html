@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>病棟マップエディタ</title>
-  <link rel="stylesheet" href="style.css?v=20260727-5">
+  <link rel="stylesheet" href="style.css?v=20260727-6">
 </head>
 <body>
   <header class="app-header">
@@ -27,6 +27,10 @@
 
     <section class="editor-panel">
       <div class="toolbar">
+        <div class="editor-mode-switch" role="group" aria-label="編集モード">
+          <button id="map-edit-mode" type="button" class="active" aria-pressed="true">設備編集</button>
+          <button id="sunlight-edit-mode" type="button" aria-pressed="false">日光調整</button>
+        </div>
         <label>レイヤー
           <select id="layer-select">
             <option value="floor">床</option>
@@ -59,9 +63,17 @@
         <button id="redo" type="button" title="やり直す">↷</button>
         <label class="grid-toggle"><input id="show-grid" type="checkbox" checked> グリッド</label>
         <button id="walk-nurse" type="button" class="nurse-test-button" title="看護師を歩かせる" aria-label="看護師を歩かせる">▶ 看</button>
-        <label class="time-preview">時間 <output id="preview-time-value" for="preview-time">12:00</output>
-          <input id="preview-time" type="range" min="0" max="1425" step="15" value="720" aria-label="日光プレビュー時刻">
-        </label>
+        <div class="sunlight-tools" aria-label="日光プレビュー調整">
+          <label class="time-preview">時間 <output id="preview-time-value" for="preview-time">12:00</output>
+            <input id="preview-time" type="range" min="0" max="1425" step="15" value="720" aria-label="日光プレビュー時刻">
+          </label>
+          <label>光の強さ <output id="sunlight-intensity-value" for="sunlight-intensity">100%</output>
+            <input id="sunlight-intensity" type="range" min="0" max="150" step="5" value="100">
+          </label>
+          <label>光の長さ <output id="sunlight-length-value" for="sunlight-length">100%</output>
+            <input id="sunlight-length" type="range" min="25" max="200" step="5" value="100">
+          </label>
+        </div>
         <div class="selection-tools" aria-label="複数選択した配置物の操作">
           <span id="selection-count">選択 0個</span>
           <button id="select-visible" type="button">編集中を全選択</button>
@@ -132,6 +144,6 @@
     </aside>
   </main>
 
-  <script src="editor.js?v=20260727-5"></script>
+  <script src="editor.js?v=20260727-6"></script>
 </body>
 </html>

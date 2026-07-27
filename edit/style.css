@@ -70,6 +70,8 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
 .toolbar select:disabled { color: #666; opacity: .65; }
 .toolbar .compact-input { width: 62px; min-height: 40px; padding: 7px; }
 .toolbar .grid-toggle { display: flex; align-items: center; min-height: 40px; }
+.editor-mode-switch { display: flex; gap: 4px; width: 100%; }
+.editor-mode-switch button { min-height: 34px; padding: 5px 10px; font-size: 12px; }
 .nurse-test-button {
   width: 50px;
   min-width: 50px;
@@ -102,6 +104,34 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
   padding: 0;
   accent-color: #e0c788;
 }
+.sunlight-tools {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+.sunlight-tools > label:not(.time-preview) {
+  grid-template-columns: auto auto;
+  width: min(200px, 100%);
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #17191b;
+}
+.sunlight-tools output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.sunlight-tools input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 18px;
+  padding: 0;
+  accent-color: #e0c788;
+}
+body:not(.sunlight-mode) .sunlight-tools { display: none; }
+body.sunlight-mode .toolbar > :not(.editor-mode-switch):not(.sunlight-tools) { display: none; }
+body.sunlight-mode .palette-panel,
+body.sunlight-mode .data-panel { display: none; }
+body.sunlight-mode .workspace { grid-template-columns: minmax(0, 1fr); }
 .selection-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; width: 100%; padding-top: 7px; border-top: 1px solid var(--line); }
 .selection-tools > span { margin-right: 3px; color: var(--muted); font-size: 12px; }
 .selection-tools button { min-width: 38px; min-height: 34px; padding: 5px 9px; font-size: 12px; }

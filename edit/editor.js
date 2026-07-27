@@ -235,6 +235,9 @@
   let nurseAnimationFrame = 0;
   let nurseHideTimer = 0;
   let previewTimeMinutes = 12 * 60;
+  let workspaceMode = "map";
+  let sunlightIntensity = 100;
+  let sunlightLength = 100;
 
   // ============================================================
   // 5. 初期化
@@ -300,6 +303,7 @@
 
   function bindCanvasControls() {
     canvas.addEventListener("pointerdown", (event) => {
+      if (workspaceMode === "sunlight") return;
       dragging = true;
       canvas.setPointerCapture(event.pointerId);
       applyPointer(event, true);
@@ -320,7 +324,11 @@
     $("picker").addEventListener("click", () => setMode("pick"));
     $("select-objects").addEventListener("click", () => setMode("select"));
     $("walk-nurse").addEventListener("click", startNurseWalk);
+    $("map-edit-mode").addEventListener("click", () => setWorkspaceMode("map"));
+    $("sunlight-edit-mode").addEventListener("click", () => setWorkspaceMode("sunlight"));
     $("preview-time").addEventListener("input", updateTimePreview);
+    $("sunlight-intensity").addEventListener("input", updateSunlightSettings);
+    $("sunlight-length").addEventListener("input", updateSunlightSettings);
   }
 
   function bindSelectionControls() {
@@ -652,7 +660,7 @@
       drawPlacement(target, p);
     }));
     target.restore();
-    if (target === ctx) drawTimePreview(target);
+    if (target === ctx && workspaceMode === "sunlight") drawTimePreview(target);
     if (includeGrid) drawGrid(target);
     if (target === ctx && nurseWalk) drawNurse(target);
     if (target === ctx && selectedPlacements.size) drawSelection(target);
@@ -712,6 +720,27 @@
     render();
   }
 
+  function setWorkspaceMode(nextMode) {
+    workspaceMode = nextMode;
+    document.body.classList.toggle("sunlight-mode", workspaceMode === "sunlight");
+    $("map-edit-mode").classList.toggle("active", workspaceMode === "map");
+    $("sunlight-edit-mode").classList.toggle("active", workspaceMode === "sunlight");
+    $("map-edit-mode").setAttribute("aria-pressed", String(workspaceMode === "map"));
+    $("sunlight-edit-mode").setAttribute("aria-pressed", String(workspaceMode === "sunlight"));
+    dragging = false;
+    clearSelection("");
+    setStatus(workspaceMode === "sunlight" ? "日光を調整中です" : "設備を編集中です");
+    render();
+  }
+
+  function updateSunlightSettings() {
+    sunlightIntensity = Number($("sunlight-intensity").value);
+    sunlightLength = Number($("sunlight-length").value);
+    $("sunlight-intensity-value").textContent = `${sunlightIntensity}%`;
+    $("sunlight-length-value").textContent = `${sunlightLength}%`;
+    render();
+  }
+
   function formatPreviewTime(minutes) {
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
@@ -723,7 +752,8 @@
     const daylight = hour <= 5 || hour >= 19
       ? 0
       : Math.sin(((hour - 5) / 14) * Math.PI);
-    const darkness = .5 * (1 - daylight);
+    const intensity = sunlightIntensity / 100;
+    const darkness = .5 * (1 - Math.min(1, daylight * intensity));
     const cell = getCellSize();
 
     target.save();
@@ -736,8 +766,8 @@
       const green = Math.round(238 - 35 * warmth);
       const blue = Math.round(194 - 82 * warmth);
       const lightColor = `${red}, ${green}, ${blue}`;
-      const shift = ((hour - 5) / 14 - .5) * cell * 5;
-      const depth = cell * (3.5 + daylight * 3);
+      const shift = -((hour - 5) / 14 - .5) * cell * 5;
+      const depth = cell * (3.5 + daylight * 3) * sunlightLength / 100;
 
       map.placements.filter((placement) => placement.tile === "window").forEach((placement) => {
         const size = footprint(placement);
@@ -748,23 +778,42 @@
         const inset = Math.max(3, cell * .08);
 
         target.globalCompositeOperation = "screen";
-        target.fillStyle = `rgba(${lightColor}, ${(daylight * .32).toFixed(3)})`;
+        target.fillStyle = `rgba(${lightColor}, ${(Math.min(1, daylight * .32 * intensity)).toFixed(3)})`;
         target.fillRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 
-        const gradient = target.createLinearGradient(0, top + height, 0, top + height + depth);
-        gradient.addColorStop(0, `rgba(${lightColor}, ${(daylight * .28).toFixed(3)})`);
-        gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
-        target.fillStyle = gradient;
-        target.beginPath();
-        target.moveTo(left + inset, top + height);
-        target.lineTo(left + width - inset, top + height);
-        target.lineTo(left + width - inset + shift, top + height + depth);
-        target.lineTo(left + inset + shift, top + height + depth);
-        target.closePath();
-        target.fill();
+        for (let segment = 0; segment < size.w; segment++) {
+          const segmentLeft = left + segment * cell + (segment === 0 ? inset : 0);
+          const segmentRight = Math.min(left + width - (segment === size.w - 1 ? inset : 0), left + (segment + 1) * cell);
+          const covered = isWindowSegmentCovered(placement, placement.x + segment);
+          const segmentDepth = covered ? cell * .25 : depth;
+          const segmentShift = shift * segmentDepth / Math.max(depth, 1);
+          const gradient = target.createLinearGradient(0, top + height, 0, top + height + segmentDepth);
+          gradient.addColorStop(0, `rgba(${lightColor}, ${(Math.min(1, daylight * .28 * intensity)).toFixed(3)})`);
+          gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
+          target.fillStyle = gradient;
+          target.beginPath();
+          target.moveTo(segmentLeft, top + height);
+          target.lineTo(segmentRight, top + height);
+          target.lineTo(segmentRight + segmentShift, top + height + segmentDepth);
+          target.lineTo(segmentLeft + segmentShift, top + height + segmentDepth);
+          target.closePath();
+          target.fill();
+        }
       });
     }
     target.restore();
+  }
+
+  function isWindowSegmentCovered(windowPlacement, segmentX) {
+    const windowSize = footprint(windowPlacement);
+    return map.placements.some((placement) => {
+      if (placement.tile !== "curtain" || !visibleLayers.has(placement.layer)) return false;
+      const curtainSize = footprint(placement);
+      const overlapsX = segmentX < placement.x + curtainSize.w && segmentX + 1 > placement.x;
+      const overlapsY = windowPlacement.y < placement.y + curtainSize.h
+        && windowPlacement.y + windowSize.h > placement.y;
+      return overlapsX && overlapsY;
+    });
   }
 
   function drawSelection(target) {
