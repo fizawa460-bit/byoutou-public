@@ -1,6 +1,26 @@
 (() => {
   "use strict";
 
+  // ============================================================
+  // 病棟マップエディタ 目次
+  // ============================================================
+  // 1. 基本設定・DOM参照
+  // 2. タイル定義
+  // 3. 見本マップ
+  // 4. 編集中の状態
+  // 5. 初期化
+  // 6. パレット生成・UIイベント登録
+  // 7. パレット・選択・配置操作
+  // 8. 描画・見た目調整
+  // 9. レイヤー表示・履歴
+  // 10. JSON/PNG入出力
+  // 11. 共通ユーティリティ
+  // 12. タイル描画関数
+
+  // ============================================================
+  // 1. 基本設定・DOM参照
+  // ============================================================
+
   const CELL = 64;
   const PALETTE_PREVIEW_SIZE = 64;
   const HISTORY_LIMIT = 50;
@@ -16,6 +36,15 @@
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
   nurseSprite.src = NURSE_SPRITE_URL;
+
+  // ============================================================
+  // 2. タイル定義
+  // ============================================================
+  // name: パレットに出る表示名
+  // layer: 配置されるレイヤー
+  // w/h: 標準の配置マス数
+  // draw: 実際にcanvasへ描く関数
+  // rotations: 選べる向き。未指定なら回転なし。
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -42,6 +71,12 @@
     grime: { name: "床の汚れ", layer: "overlay", w: 1, h: 1, draw: drawGrime },
     shadow: { name: "境界の影", layer: "overlay", w: 1, h: 1, draw: drawShadow }
   };
+
+  // ============================================================
+  // 3. 見本マップ
+  // ============================================================
+  // 「見本を復元」で読み込む初期データ。
+  // 通常の保存JSONと同じ形なので、ここを差し替えれば別の見本にできる。
 
   const sample = {
     version: 1,
@@ -180,6 +215,10 @@
     ]
   };
 
+  // ============================================================
+  // 4. 編集中の状態
+  // ============================================================
+
   let map = clone(sample);
   let selectedTile = "futon";
   let mode = "paint";
@@ -196,11 +235,21 @@
   let nurseAnimationFrame = 0;
   let nurseHideTimer = 0;
 
+  // ============================================================
+  // 5. 初期化
+  // ============================================================
+
   buildPalette();
   bindControls();
   syncSelectionControls();
   syncFields();
   render();
+
+  // ============================================================
+  // 6. パレット生成・UIイベント登録
+  // ============================================================
+  // パレットを作り、HTML上のボタンや入力欄に処理をつなぐ場所。
+  // 操作を増やす時は、まずここに対応するbind関数があるか見る。
 
   function buildPalette() {
     const palette = $("palette");
@@ -336,6 +385,12 @@
       if (event.key === "Escape") clearSelection("選択を解除しました");
     });
   }
+
+  // ============================================================
+  // 7. パレット・選択・配置操作
+  // ============================================================
+  // タイル選択、配置、削除、スポイト、複数選択を扱う。
+  // マップ内容そのものを変える処理は、原則ここか履歴/入出力周りにある。
 
   function filterPaletteByLayer(layer) {
     let firstVisibleTile = null;
@@ -576,6 +631,12 @@
     return { w: tile.w, h: tile.h };
   }
 
+  // ============================================================
+  // 8. 描画・見た目調整
+  // ============================================================
+  // canvasへ現在のマップを描く処理。
+  // 見た目調整はCSSではなくcanvas描画のfilter/線幅に反映する。
+
   function render(target = ctx, includeGrid = showGrid) {
     const cell = getCellSize();
     canvas.width = map.width * cell;
@@ -751,6 +812,11 @@
     target.restore();
   }
 
+  // ============================================================
+  // 9. レイヤー表示・履歴
+  // ============================================================
+  // 表示するレイヤーの切り替えと、Undo/Redo用の履歴管理。
+
   function layerName(layer) {
     return ({ floor: "床", structure: "壁・構造", fixture: "設備", overlay: "装飾・影" })[layer] || layer;
   }
@@ -838,6 +904,12 @@
     syncFields(); render(); setStatus(`マップを${map.width}×${map.height}マス／1マス${map.cellSize}pxに変更しました`);
   }
 
+  // ============================================================
+  // 10. JSON/PNG入出力
+  // ============================================================
+  // 右側のJSON欄、JSON保存/読込、PNG書出しを扱う。
+  // JSON形式を変える時は、validateMapとformatMapJsonを一緒に見る。
+
   function syncFields() {
     $("map-name").value = map.name;
     $("map-width").value = map.width;
@@ -907,6 +979,12 @@
     out.restore();
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
   }
+
+  // ============================================================
+  // 11. 共通ユーティリティ
+  // ============================================================
+  // どの処理からも使う小さい道具置き場。
+
   function download(blob, filename) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -947,6 +1025,14 @@
     g.lineWidth = line;
     g.strokeRect(x + line / 2, y + line / 2, w - line, h - line);
   }
+
+  // ============================================================
+  // 12. タイル描画関数
+  // ============================================================
+  // tiles定義のdrawから呼ばれるcanvas描画専用関数。
+  // 新しいパーツを増やす時は、tilesに定義を足して、ここにdraw関数を追加する。
+  // ここは見た目のコードなので、ゲーム本編の進行ロジックとは独立している。
+
   function drawFloor(g, x, y, w, h) { rect(g, x, y, w, h, "#77736b", "#59564f", 2); g.fillStyle = "rgba(255,255,255,.035)"; for (let i = 0; i < 8; i++) g.fillRect(x + (i * 19 + y) % w, y + (i * 31 + x) % h, 2, 2); }
   function drawFloorDark(g, x, y, w, h) { rect(g, x, y, w, h, "#55534e", "#42413d", 2); }
   function drawWallTop(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x, y + h); grad.addColorStop(0, "#a09b91"); grad.addColorStop(.18, "#6c6963"); grad.addColorStop(1, "#393a39"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(x + 3, y + 4, w - 6, 5); }
