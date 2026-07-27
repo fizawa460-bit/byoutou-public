@@ -2,6 +2,9 @@
   "use strict";
 
   const CELL = 64;
+  const PALETTE_PREVIEW_SIZE = 64;
+  const HISTORY_LIMIT = 50;
+  const NURSE_SPRITE_URL = "assets/nurse-walk-6.png?v=20260727-4";
   const LAYERS = ["floor", "structure", "fixture", "overlay"];
   const DEFAULT_APPEARANCE = Object.freeze({
     hue: 0,
@@ -12,7 +15,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-4";
+  nurseSprite.src = NURSE_SPRITE_URL;
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -207,8 +210,8 @@
       button.className = "tile-button";
       button.dataset.tile = id;
       const preview = document.createElement("canvas");
-      preview.width = 64;
-      preview.height = 64;
+      preview.width = PALETTE_PREVIEW_SIZE;
+      preview.height = PALETTE_PREVIEW_SIZE;
       preview.className = "tile-preview";
       const label = document.createElement("span");
       label.textContent = tile.name;
@@ -229,28 +232,61 @@
       previewContext.clearRect(0, 0, preview.width, preview.height);
       previewContext.save();
       previewContext.filter = appearanceFilter();
-      tile.draw(createAppearanceContext(previewContext), 0, 0, 64, 64, true);
+      tile.draw(createAppearanceContext(previewContext), 0, 0, PALETTE_PREVIEW_SIZE, PALETTE_PREVIEW_SIZE, true);
       previewContext.restore();
     });
   }
 
   function bindControls() {
-    canvas.addEventListener("pointerdown", (event) => { dragging = true; canvas.setPointerCapture(event.pointerId); applyPointer(event, true); });
-    canvas.addEventListener("pointermove", (event) => { if (dragging) applyPointer(event, false); });
-    canvas.addEventListener("pointerup", () => { dragging = false; });
-    canvas.addEventListener("pointercancel", () => { dragging = false; });
+    bindCanvasControls();
+    bindToolControls();
+    bindSelectionControls();
+    bindHistoryControls();
+    bindLayerControls();
+    bindAppearanceControls();
+    bindMapDataControls();
+    bindKeyboardControls();
+  }
+
+  function bindCanvasControls() {
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      applyPointer(event, true);
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (dragging) applyPointer(event, false);
+    });
+    canvas.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+    canvas.addEventListener("pointercancel", () => {
+      dragging = false;
+    });
+  }
+
+  function bindToolControls() {
     $("eraser").addEventListener("click", () => setMode("erase"));
     $("picker").addEventListener("click", () => setMode("pick"));
     $("select-objects").addEventListener("click", () => setMode("select"));
+    $("walk-nurse").addEventListener("click", startNurseWalk);
+  }
+
+  function bindSelectionControls() {
     $("select-visible").addEventListener("click", selectVisiblePlacements);
     $("clear-selection").addEventListener("click", () => clearSelection("選択を解除しました"));
     $("delete-selection").addEventListener("click", deleteSelectedPlacements);
     document.querySelectorAll(".move-selection").forEach((button) => button.addEventListener("click", () => {
       moveSelectedPlacements(Number(button.dataset.dx), Number(button.dataset.dy));
     }));
+  }
+
+  function bindHistoryControls() {
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
-    $("walk-nurse").addEventListener("click", startNurseWalk);
+  }
+
+  function bindLayerControls() {
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
     $("layer-select").addEventListener("change", (event) => {
       showLayer(event.target.value);
@@ -261,13 +297,19 @@
     $("tile-width").addEventListener("change", syncSelectedSize);
     $("tile-height").addEventListener("change", syncSelectedSize);
     $("reset-tile-size").addEventListener("click", resetSelectedSize);
+    $("show-all-layers").addEventListener("click", showAllLayers);
+    $("show-only-active").addEventListener("click", showOnlyActiveLayer);
+    document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
+  }
+
+  function bindAppearanceControls() {
     ["appearance-hue", "appearance-brightness", "appearance-line-width"].forEach((id) => {
       $(id).addEventListener("input", updateAppearance);
     });
     $("reset-appearance").addEventListener("click", resetAppearance);
-    $("show-all-layers").addEventListener("click", showAllLayers);
-    $("show-only-active").addEventListener("click", showOnlyActiveLayer);
-    document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
+  }
+
+  function bindMapDataControls() {
     $("load-sample").addEventListener("click", () => replaceMap(sample, "見本を復元しました"));
     $("new-map").addEventListener("click", newMap);
     $("resize-map").addEventListener("click", resizeMap);
@@ -277,6 +319,9 @@
     $("json-file").addEventListener("change", loadJsonFile);
     $("apply-json").addEventListener("click", () => importJson($("json-text").value));
     $("export-png").addEventListener("click", exportPng);
+  }
+
+  function bindKeyboardControls() {
     window.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       if (mode === "select" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
@@ -448,10 +493,14 @@
   }
 
   function clearSelection(message = "") {
-    selectedPlacements.clear();
-    syncSelectionControls();
+    clearSelectionState();
     render();
     if (message) setStatus(message);
+  }
+
+  function clearSelectionState() {
+    selectedPlacements.clear();
+    syncSelectionControls();
   }
 
   function syncSelectionControls() {
@@ -741,11 +790,38 @@
     $("show-only-active").classList.toggle("active", visibleLayers.size === 1 && visibleLayers.has(active));
   }
 
-  function remember() { history.push(clone(map)); if (history.length > 50) history.shift(); future = []; }
-  function undo() { if (!history.length) return; future.push(clone(map)); map = history.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
-  function redo() { if (!future.length) return; history.push(clone(map)); map = future.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
+  function remember() {
+    history.push(clone(map));
+    if (history.length > HISTORY_LIMIT) history.shift();
+    future = [];
+  }
 
-  function replaceMap(next, message) { remember(); map = validateMap(clone(next)); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); setStatus(message); }
+  function undo() {
+    if (!history.length) return;
+    future.push(clone(map));
+    map = history.pop();
+    clearSelectionState();
+    syncFields();
+    render();
+  }
+
+  function redo() {
+    if (!future.length) return;
+    history.push(clone(map));
+    map = future.pop();
+    clearSelectionState();
+    syncFields();
+    render();
+  }
+
+  function replaceMap(next, message) {
+    remember();
+    map = validateMap(clone(next));
+    clearSelectionState();
+    syncFields();
+    render();
+    setStatus(message);
+  }
   function newMap() {
     const width = clamp(Number($("map-width").value), 6, 40);
     const height = clamp(Number($("map-height").value), 6, 40);
@@ -770,8 +846,13 @@
     syncAppearanceControls();
     refreshJson();
   }
-  function refreshJson() { $("json-text").value = formatMapJson(map); }
-  function saveJson() { download(new Blob([formatMapJson(map)], { type: "application/json" }), `${safeName(map.name)}.json`); }
+  function refreshJson() {
+    $("json-text").value = formatMapJson(map);
+  }
+
+  function saveJson() {
+    download(new Blob([formatMapJson(map)], { type: "application/json" }), `${safeName(map.name)}.json`);
+  }
   function formatMapJson(value) {
     const { placements, ...meta } = value;
     const header = JSON.stringify(meta, null, 2).replace(/\n}$/, "");
@@ -826,18 +907,46 @@
     out.restore();
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
   }
-  function download(blob, filename) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-  function safeName(name) { return name.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-|-$/g, "") || "map"; }
-  function setStatus(text) { $("status").textContent = text; }
-  function clone(value) { return JSON.parse(JSON.stringify(value)); }
-  function clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(value || min))); }
+  function download(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function safeName(name) {
+    return name.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-|-$/g, "") || "map";
+  }
+
+  function setStatus(message) {
+    $("status").textContent = message;
+  }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, Math.round(value || min)));
+  }
   function clampNumber(value, min, max, fallback) {
     const number = Number(value);
     return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback;
   }
-  function getCellSize() { return clamp(Number(map.cellSize || CELL), 16, 128); }
+  function getCellSize() {
+    return clamp(Number(map.cellSize || CELL), 16, 128);
+  }
 
-  function rect(g, x, y, w, h, fill, stroke = null, line = 1) { g.fillStyle = fill; g.fillRect(x, y, w, h); if (stroke) { g.strokeStyle = stroke; g.lineWidth = line; g.strokeRect(x + line / 2, y + line / 2, w - line, h - line); } }
+  function rect(g, x, y, w, h, fill, stroke = null, line = 1) {
+    g.fillStyle = fill;
+    g.fillRect(x, y, w, h);
+    if (!stroke) return;
+    g.strokeStyle = stroke;
+    g.lineWidth = line;
+    g.strokeRect(x + line / 2, y + line / 2, w - line, h - line);
+  }
   function drawFloor(g, x, y, w, h) { rect(g, x, y, w, h, "#77736b", "#59564f", 2); g.fillStyle = "rgba(255,255,255,.035)"; for (let i = 0; i < 8; i++) g.fillRect(x + (i * 19 + y) % w, y + (i * 31 + x) % h, 2, 2); }
   function drawFloorDark(g, x, y, w, h) { rect(g, x, y, w, h, "#55534e", "#42413d", 2); }
   function drawWallTop(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x, y + h); grad.addColorStop(0, "#a09b91"); grad.addColorStop(.18, "#6c6963"); grad.addColorStop(1, "#393a39"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(x + 3, y + 4, w - 6, 5); }
