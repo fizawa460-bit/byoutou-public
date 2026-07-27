@@ -238,6 +238,7 @@
   let workspaceMode = "map";
   let sunlightIntensity = 100;
   let sunlightLength = 100;
+  let sunsetColor = "#ff9b55";
 
   // ============================================================
   // 5. 初期化
@@ -329,6 +330,7 @@
     $("preview-time").addEventListener("input", updateTimePreview);
     $("sunlight-intensity").addEventListener("input", updateSunlightSettings);
     $("sunlight-length").addEventListener("input", updateSunlightSettings);
+    $("sunset-color").addEventListener("input", updateSunlightSettings);
   }
 
   function bindSelectionControls() {
@@ -736,8 +738,10 @@
   function updateSunlightSettings() {
     sunlightIntensity = Number($("sunlight-intensity").value);
     sunlightLength = Number($("sunlight-length").value);
+    sunsetColor = $("sunset-color").value;
     $("sunlight-intensity-value").textContent = `${sunlightIntensity}%`;
     $("sunlight-length-value").textContent = `${sunlightLength}%`;
+    $("sunset-color-value").textContent = sunsetColor.toUpperCase();
     render();
   }
 
@@ -745,6 +749,15 @@
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
     return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  function hexToRgb(value) {
+    const hex = value.replace("#", "");
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16)
+    };
   }
 
   function sunlightLengthAtHour(hour) {
@@ -774,9 +787,16 @@
 
     if (daylight > .04 && visibleLayers.has("structure")) {
       const warmth = Math.min(1, Math.abs(hour - 12) / 7);
-      const red = Math.round(246 + 9 * warmth);
-      const green = Math.round(238 - 35 * warmth);
-      const blue = Math.round(194 - 82 * warmth);
+      let red = Math.round(246 + 9 * warmth);
+      let green = Math.round(238 - 35 * warmth);
+      let blue = Math.round(194 - 82 * warmth);
+      if (hour > 12) {
+        const sunset = hexToRgb(sunsetColor);
+        const sunsetMix = (1 - Math.cos(Math.PI * Math.min(1, (hour - 12) / 5))) / 2;
+        red = Math.round(246 + (sunset.r - 246) * sunsetMix);
+        green = Math.round(238 + (sunset.g - 238) * sunsetMix);
+        blue = Math.round(194 + (sunset.b - 194) * sunsetMix);
+      }
       const lightColor = `${red}, ${green}, ${blue}`;
       const shift = -((hour - 5) / 14 - .5) * cell * 5;
       const automaticLength = sunlightLengthAtHour(hour);
