@@ -820,11 +820,25 @@
       const roomLeft = cell;
       const roomWidth = Math.max(0, (map.width - 2) * cell);
       const roomHeight = Math.max(0, (map.height - 1) * cell - roomTop);
+      const lightX = roomLeft + roomWidth / 2;
+      const lightY = roomTop + roomHeight / 2;
+      const radius = Math.max(roomWidth, roomHeight) * .72;
       target.save();
+      target.beginPath();
+      target.rect(roomLeft, roomTop, roomWidth, roomHeight);
+      target.clip();
       target.globalCompositeOperation = "screen";
-      target.fillStyle = `rgba(244, 237, 214, ${(.24 * roomLight).toFixed(3)})`;
+      const roomGradient = target.createRadialGradient(lightX, lightY, 0, lightX, lightY, radius);
+      roomGradient.addColorStop(0, `rgba(250, 244, 224, ${(.3 * roomLight).toFixed(3)})`);
+      roomGradient.addColorStop(.52, `rgba(244, 237, 214, ${(.17 * roomLight).toFixed(3)})`);
+      roomGradient.addColorStop(1, `rgba(235, 228, 208, ${(.055 * roomLight).toFixed(3)})`);
+      target.fillStyle = roomGradient;
       target.fillRect(roomLeft, roomTop, roomWidth, roomHeight);
+      target.strokeStyle = `rgba(246, 239, 219, ${(.07 * roomLight).toFixed(3)})`;
+      target.lineWidth = Math.max(3, cell * .1);
+      target.strokeRect(roomLeft + 2, roomTop + 2, roomWidth - 4, roomHeight - 4);
       target.restore();
+      drawEquipmentShadows(target, { roomLeft, roomTop, roomWidth, roomHeight, lightX, lightY, radius, roomLight, cell });
     }
 
     const corridorSpill = smoothLightingStep(17.5, 18, hour);
@@ -846,6 +860,48 @@
         target.fillRect(gap.left, lightTop, gap.right - gap.left, barTop - lightTop);
       });
     });
+    target.restore();
+  }
+
+  function drawEquipmentShadows(target, lighting) {
+    const ignoredTiles = new Set(["curtain", "mealHatchClosed", "mealHatchOpen"]);
+    target.save();
+    target.beginPath();
+    target.rect(lighting.roomLeft, lighting.roomTop, lighting.roomWidth, lighting.roomHeight);
+    target.clip();
+    target.globalCompositeOperation = "multiply";
+    target.filter = `blur(${Math.max(2, lighting.cell * .055)}px)`;
+    target.fillStyle = `rgba(22, 20, 18, ${(.17 * lighting.roomLight).toFixed(3)})`;
+
+    map.placements
+      .filter((placement) => placement.layer === "fixture" && !ignoredTiles.has(placement.tile))
+      .forEach((placement) => {
+        const size = footprint(placement);
+        const x = placement.x * lighting.cell;
+        const y = placement.y * lighting.cell;
+        const width = size.w * lighting.cell;
+        const height = size.h * lighting.cell;
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        if (
+          centerX < lighting.roomLeft
+          || centerX > lighting.roomLeft + lighting.roomWidth
+          || centerY < lighting.roomTop
+          || centerY > lighting.roomTop + lighting.roomHeight
+        ) return;
+
+        const dx = centerX - lighting.lightX;
+        const dy = centerY - lighting.lightY;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const offsetLength = lighting.cell * (.1 + Math.min(.2, distance / lighting.radius * .18));
+        const offsetX = dx / distance * offsetLength;
+        const offsetY = dy / distance * offsetLength;
+        const inset = Math.max(2, lighting.cell * .07);
+        const shadow = new Path2D();
+        shadow.rect(x + inset + offsetX, y + inset + offsetY, Math.max(1, width - inset * 2), Math.max(1, height - inset * 2));
+        shadow.rect(x + inset, y + inset, Math.max(1, width - inset * 2), Math.max(1, height - inset * 2));
+        target.fill(shadow, "evenodd");
+      });
     target.restore();
   }
 
