@@ -953,6 +953,13 @@
   }
 
   function isWindowSegmentCovered(windowPlacement, segmentX) {
+    const passesThroughGlass = map.placements.some((placement) => {
+      if (placement.tile !== "bars" || footprint(placement).w !== 1 || placement.y <= windowPlacement.y) return false;
+      const size = footprint(placement);
+      return segmentX < placement.x + size.w && segmentX + 1 > placement.x;
+    });
+    if (passesThroughGlass) return false;
+
     const windowSize = footprint(windowPlacement);
     return map.placements.some((placement) => {
       if (placement.tile !== "curtain" || !visibleLayers.has(placement.layer)) return false;
