@@ -762,9 +762,9 @@
 
   function sunlightLengthAtHour(hour) {
     if (hour <= 7) return 1;
-    if (hour <= 12) return curvedMix(1, .5, (hour - 7) / 5);
-    if (hour <= 17) return curvedMix(.5, 2, (hour - 12) / 5);
-    return 2;
+    if (hour <= 12) return curvedMix(1, .6, (hour - 7) / 5);
+    if (hour <= 17) return curvedMix(.6, 1.35, (hour - 12) / 5);
+    return 1.35;
   }
 
   function curvedMix(from, to, progress) {
