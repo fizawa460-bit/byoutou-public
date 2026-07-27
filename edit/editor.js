@@ -1,30 +1,7 @@
 (() => {
   "use strict";
 
-  // ============================================================
-  // 病棟マップエディタ 目次
-  // ============================================================
-  // 1. 基本設定・DOM参照
-  // 2. タイル定義
-  // 3. 見本マップ
-  // 4. 編集中の状態
-  // 5. 初期化
-  // 6. パレット生成・UIイベント登録
-  // 7. パレット・選択・配置操作
-  // 8. 描画・見た目調整
-  // 9. レイヤー表示・履歴
-  // 10. JSON/PNG入出力
-  // 11. 共通ユーティリティ
-  // 12. タイル描画関数
-
-  // ============================================================
-  // 1. 基本設定・DOM参照
-  // ============================================================
-
   const CELL = 64;
-  const PALETTE_PREVIEW_SIZE = 64;
-  const HISTORY_LIMIT = 50;
-  const NURSE_SPRITE_URL = "assets/nurse-walk-6.png?v=20260727-4";
   const LAYERS = ["floor", "structure", "fixture", "overlay"];
   const DEFAULT_APPEARANCE = Object.freeze({
     hue: 0,
@@ -35,16 +12,7 @@
   const canvas = $("map-canvas");
   const ctx = canvas.getContext("2d");
   const nurseSprite = new Image();
-  nurseSprite.src = NURSE_SPRITE_URL;
-
-  // ============================================================
-  // 2. タイル定義
-  // ============================================================
-  // name: パレットに出る表示名
-  // layer: 配置されるレイヤー
-  // w/h: 標準の配置マス数
-  // draw: 実際にcanvasへ描く関数
-  // rotations: 選べる向き。未指定なら回転なし。
+  nurseSprite.src = "assets/nurse-walk-6.png?v=20260727-4";
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -71,12 +39,6 @@
     grime: { name: "床の汚れ", layer: "overlay", w: 1, h: 1, draw: drawGrime },
     shadow: { name: "境界の影", layer: "overlay", w: 1, h: 1, draw: drawShadow }
   };
-
-  // ============================================================
-  // 3. 見本マップ
-  // ============================================================
-  // 「見本を復元」で読み込む初期データ。
-  // 通常の保存JSONと同じ形なので、ここを差し替えれば別の見本にできる。
 
   const sample = {
     version: 1,
@@ -215,10 +177,6 @@
     ]
   };
 
-  // ============================================================
-  // 4. 編集中の状態
-  // ============================================================
-
   let map = clone(sample);
   let selectedTile = "futon";
   let mode = "paint";
@@ -235,22 +193,15 @@
   let nurseAnimationFrame = 0;
   let nurseHideTimer = 0;
   let previewTimeMinutes = 12 * 60;
-
-  // ============================================================
-  // 5. 初期化
-  // ============================================================
+  let workspaceMode = "map";
+  let sunlightIntensity = 100;
+  let sunlightLength = 100;
 
   buildPalette();
   bindControls();
   syncSelectionControls();
   syncFields();
   render();
-
-  // ============================================================
-  // 6. パレット生成・UIイベント登録
-  // ============================================================
-  // パレットを作り、HTML上のボタンや入力欄に処理をつなぐ場所。
-  // 操作を増やす時は、まずここに対応するbind関数があるか見る。
 
   function buildPalette() {
     const palette = $("palette");
@@ -260,8 +211,8 @@
       button.className = "tile-button";
       button.dataset.tile = id;
       const preview = document.createElement("canvas");
-      preview.width = PALETTE_PREVIEW_SIZE;
-      preview.height = PALETTE_PREVIEW_SIZE;
+      preview.width = 64;
+      preview.height = 64;
       preview.className = "tile-preview";
       const label = document.createElement("span");
       label.textContent = tile.name;
@@ -282,62 +233,38 @@
       previewContext.clearRect(0, 0, preview.width, preview.height);
       previewContext.save();
       previewContext.filter = appearanceFilter();
-      tile.draw(createAppearanceContext(previewContext), 0, 0, PALETTE_PREVIEW_SIZE, PALETTE_PREVIEW_SIZE, true);
+      tile.draw(createAppearanceContext(previewContext), 0, 0, 64, 64, true);
       previewContext.restore();
     });
   }
 
   function bindControls() {
-    bindCanvasControls();
-    bindToolControls();
-    bindSelectionControls();
-    bindHistoryControls();
-    bindLayerControls();
-    bindAppearanceControls();
-    bindMapDataControls();
-    bindKeyboardControls();
-  }
-
-  function bindCanvasControls() {
     canvas.addEventListener("pointerdown", (event) => {
+      if (workspaceMode === "sunlight") return;
       dragging = true;
       canvas.setPointerCapture(event.pointerId);
       applyPointer(event, true);
     });
-    canvas.addEventListener("pointermove", (event) => {
-      if (dragging) applyPointer(event, false);
-    });
-    canvas.addEventListener("pointerup", () => {
-      dragging = false;
-    });
-    canvas.addEventListener("pointercancel", () => {
-      dragging = false;
-    });
-  }
-
-  function bindToolControls() {
+    canvas.addEventListener("pointermove", (event) => { if (dragging) applyPointer(event, false); });
+    canvas.addEventListener("pointerup", () => { dragging = false; });
+    canvas.addEventListener("pointercancel", () => { dragging = false; });
     $("eraser").addEventListener("click", () => setMode("erase"));
     $("picker").addEventListener("click", () => setMode("pick"));
     $("select-objects").addEventListener("click", () => setMode("select"));
-    $("walk-nurse").addEventListener("click", startNurseWalk);
-    $("preview-time").addEventListener("input", updateTimePreview);
-  }
-
-  function bindSelectionControls() {
     $("select-visible").addEventListener("click", selectVisiblePlacements);
     $("clear-selection").addEventListener("click", () => clearSelection("選択を解除しました"));
     $("delete-selection").addEventListener("click", deleteSelectedPlacements);
     document.querySelectorAll(".move-selection").forEach((button) => button.addEventListener("click", () => {
       moveSelectedPlacements(Number(button.dataset.dx), Number(button.dataset.dy));
     }));
-  }
-
-  function bindHistoryControls() {
     $("undo").addEventListener("click", undo);
     $("redo").addEventListener("click", redo);
-  }
-
-  function bindLayerControls() {
+    $("walk-nurse").addEventListener("click", startNurseWalk);
+    $("map-edit-mode").addEventListener("click", () => setWorkspaceMode("map"));
+    $("sunlight-edit-mode").addEventListener("click", () => setWorkspaceMode("sunlight"));
+    $("preview-time").addEventListener("input", updateTimePreview);
+    $("sunlight-intensity").addEventListener("input", updateSunlightSettings);
+    $("sunlight-length").addEventListener("input", updateSunlightSettings);
     $("show-grid").addEventListener("change", (event) => { showGrid = event.target.checked; render(); });
     $("layer-select").addEventListener("change", (event) => {
       showLayer(event.target.value);
@@ -348,19 +275,13 @@
     $("tile-width").addEventListener("change", syncSelectedSize);
     $("tile-height").addEventListener("change", syncSelectedSize);
     $("reset-tile-size").addEventListener("click", resetSelectedSize);
-    $("show-all-layers").addEventListener("click", showAllLayers);
-    $("show-only-active").addEventListener("click", showOnlyActiveLayer);
-    document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
-  }
-
-  function bindAppearanceControls() {
     ["appearance-hue", "appearance-brightness", "appearance-line-width"].forEach((id) => {
       $(id).addEventListener("input", updateAppearance);
     });
     $("reset-appearance").addEventListener("click", resetAppearance);
-  }
-
-  function bindMapDataControls() {
+    $("show-all-layers").addEventListener("click", showAllLayers);
+    $("show-only-active").addEventListener("click", showOnlyActiveLayer);
+    document.querySelectorAll(".layer-eye").forEach((button) => button.addEventListener("click", () => toggleLayer(button.dataset.layer)));
     $("load-sample").addEventListener("click", () => replaceMap(sample, "見本を復元しました"));
     $("new-map").addEventListener("click", newMap);
     $("resize-map").addEventListener("click", resizeMap);
@@ -370,9 +291,6 @@
     $("json-file").addEventListener("change", loadJsonFile);
     $("apply-json").addEventListener("click", () => importJson($("json-text").value));
     $("export-png").addEventListener("click", exportPng);
-  }
-
-  function bindKeyboardControls() {
     window.addEventListener("keydown", (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       if (mode === "select" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
@@ -387,12 +305,6 @@
       if (event.key === "Escape") clearSelection("選択を解除しました");
     });
   }
-
-  // ============================================================
-  // 7. パレット・選択・配置操作
-  // ============================================================
-  // タイル選択、配置、削除、スポイト、複数選択を扱う。
-  // マップ内容そのものを変える処理は、原則ここか履歴/入出力周りにある。
 
   function filterPaletteByLayer(layer) {
     let firstVisibleTile = null;
@@ -550,14 +462,10 @@
   }
 
   function clearSelection(message = "") {
-    clearSelectionState();
-    render();
-    if (message) setStatus(message);
-  }
-
-  function clearSelectionState() {
     selectedPlacements.clear();
     syncSelectionControls();
+    render();
+    if (message) setStatus(message);
   }
 
   function syncSelectionControls() {
@@ -633,12 +541,6 @@
     return { w: tile.w, h: tile.h };
   }
 
-  // ============================================================
-  // 8. 描画・見た目調整
-  // ============================================================
-  // canvasへ現在のマップを描く処理。
-  // 見た目調整はCSSではなくcanvas描画のfilter/線幅に反映する。
-
   function render(target = ctx, includeGrid = showGrid) {
     const cell = getCellSize();
     canvas.width = map.width * cell;
@@ -652,7 +554,7 @@
       drawPlacement(target, p);
     }));
     target.restore();
-    if (target === ctx) drawTimePreview(target);
+    if (target === ctx && workspaceMode === "sunlight") drawTimePreview(target);
     if (includeGrid) drawGrid(target);
     if (target === ctx && nurseWalk) drawNurse(target);
     if (target === ctx && selectedPlacements.size) drawSelection(target);
@@ -712,6 +614,27 @@
     render();
   }
 
+  function setWorkspaceMode(nextMode) {
+    workspaceMode = nextMode;
+    document.body.classList.toggle("sunlight-mode", workspaceMode === "sunlight");
+    $("map-edit-mode").classList.toggle("active", workspaceMode === "map");
+    $("sunlight-edit-mode").classList.toggle("active", workspaceMode === "sunlight");
+    $("map-edit-mode").setAttribute("aria-pressed", String(workspaceMode === "map"));
+    $("sunlight-edit-mode").setAttribute("aria-pressed", String(workspaceMode === "sunlight"));
+    dragging = false;
+    clearSelection("");
+    setStatus(workspaceMode === "sunlight" ? "日光を調整中です" : "設備を編集中です");
+    render();
+  }
+
+  function updateSunlightSettings() {
+    sunlightIntensity = Number($("sunlight-intensity").value);
+    sunlightLength = Number($("sunlight-length").value);
+    $("sunlight-intensity-value").textContent = `${sunlightIntensity}%`;
+    $("sunlight-length-value").textContent = `${sunlightLength}%`;
+    render();
+  }
+
   function formatPreviewTime(minutes) {
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
@@ -723,7 +646,8 @@
     const daylight = hour <= 5 || hour >= 19
       ? 0
       : Math.sin(((hour - 5) / 14) * Math.PI);
-    const darkness = .5 * (1 - daylight);
+    const intensity = sunlightIntensity / 100;
+    const darkness = .5 * (1 - Math.min(1, daylight * intensity));
     const cell = getCellSize();
 
     target.save();
@@ -736,8 +660,8 @@
       const green = Math.round(238 - 35 * warmth);
       const blue = Math.round(194 - 82 * warmth);
       const lightColor = `${red}, ${green}, ${blue}`;
-      const shift = ((hour - 5) / 14 - .5) * cell * 5;
-      const depth = cell * (3.5 + daylight * 3);
+      const shift = -((hour - 5) / 14 - .5) * cell * 5;
+      const depth = cell * (3.5 + daylight * 3) * sunlightLength / 100;
 
       map.placements.filter((placement) => placement.tile === "window").forEach((placement) => {
         const size = footprint(placement);
@@ -748,23 +672,42 @@
         const inset = Math.max(3, cell * .08);
 
         target.globalCompositeOperation = "screen";
-        target.fillStyle = `rgba(${lightColor}, ${(daylight * .32).toFixed(3)})`;
+        target.fillStyle = `rgba(${lightColor}, ${(Math.min(1, daylight * .32 * intensity)).toFixed(3)})`;
         target.fillRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 
-        const gradient = target.createLinearGradient(0, top + height, 0, top + height + depth);
-        gradient.addColorStop(0, `rgba(${lightColor}, ${(daylight * .28).toFixed(3)})`);
-        gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
-        target.fillStyle = gradient;
-        target.beginPath();
-        target.moveTo(left + inset, top + height);
-        target.lineTo(left + width - inset, top + height);
-        target.lineTo(left + width - inset + shift, top + height + depth);
-        target.lineTo(left + inset + shift, top + height + depth);
-        target.closePath();
-        target.fill();
+        for (let segment = 0; segment < size.w; segment++) {
+          const segmentLeft = left + segment * cell + (segment === 0 ? inset : 0);
+          const segmentRight = Math.min(left + width - (segment === size.w - 1 ? inset : 0), left + (segment + 1) * cell);
+          const covered = isWindowSegmentCovered(placement, placement.x + segment);
+          const segmentDepth = covered ? cell * .25 : depth;
+          const segmentShift = shift * segmentDepth / Math.max(depth, 1);
+          const gradient = target.createLinearGradient(0, top + height, 0, top + height + segmentDepth);
+          gradient.addColorStop(0, `rgba(${lightColor}, ${(Math.min(1, daylight * .28 * intensity)).toFixed(3)})`);
+          gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
+          target.fillStyle = gradient;
+          target.beginPath();
+          target.moveTo(segmentLeft, top + height);
+          target.lineTo(segmentRight, top + height);
+          target.lineTo(segmentRight + segmentShift, top + height + segmentDepth);
+          target.lineTo(segmentLeft + segmentShift, top + height + segmentDepth);
+          target.closePath();
+          target.fill();
+        }
       });
     }
     target.restore();
+  }
+
+  function isWindowSegmentCovered(windowPlacement, segmentX) {
+    const windowSize = footprint(windowPlacement);
+    return map.placements.some((placement) => {
+      if (placement.tile !== "curtain" || !visibleLayers.has(placement.layer)) return false;
+      const curtainSize = footprint(placement);
+      const overlapsX = segmentX < placement.x + curtainSize.w && segmentX + 1 > placement.x;
+      const overlapsY = windowPlacement.y < placement.y + curtainSize.h
+        && windowPlacement.y + windowSize.h > placement.y;
+      return overlapsX && overlapsY;
+    });
   }
 
   function drawSelection(target) {
@@ -876,11 +819,6 @@
     target.restore();
   }
 
-  // ============================================================
-  // 9. レイヤー表示・履歴
-  // ============================================================
-  // 表示するレイヤーの切り替えと、Undo/Redo用の履歴管理。
-
   function layerName(layer) {
     return ({ floor: "床", structure: "壁・構造", fixture: "設備", overlay: "装飾・影" })[layer] || layer;
   }
@@ -920,38 +858,11 @@
     $("show-only-active").classList.toggle("active", visibleLayers.size === 1 && visibleLayers.has(active));
   }
 
-  function remember() {
-    history.push(clone(map));
-    if (history.length > HISTORY_LIMIT) history.shift();
-    future = [];
-  }
+  function remember() { history.push(clone(map)); if (history.length > 50) history.shift(); future = []; }
+  function undo() { if (!history.length) return; future.push(clone(map)); map = history.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
+  function redo() { if (!future.length) return; history.push(clone(map)); map = future.pop(); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); }
 
-  function undo() {
-    if (!history.length) return;
-    future.push(clone(map));
-    map = history.pop();
-    clearSelectionState();
-    syncFields();
-    render();
-  }
-
-  function redo() {
-    if (!future.length) return;
-    history.push(clone(map));
-    map = future.pop();
-    clearSelectionState();
-    syncFields();
-    render();
-  }
-
-  function replaceMap(next, message) {
-    remember();
-    map = validateMap(clone(next));
-    clearSelectionState();
-    syncFields();
-    render();
-    setStatus(message);
-  }
+  function replaceMap(next, message) { remember(); map = validateMap(clone(next)); selectedPlacements.clear(); syncSelectionControls(); syncFields(); render(); setStatus(message); }
   function newMap() {
     const width = clamp(Number($("map-width").value), 6, 40);
     const height = clamp(Number($("map-height").value), 6, 40);
@@ -968,12 +879,6 @@
     syncFields(); render(); setStatus(`マップを${map.width}×${map.height}マス／1マス${map.cellSize}pxに変更しました`);
   }
 
-  // ============================================================
-  // 10. JSON/PNG入出力
-  // ============================================================
-  // 右側のJSON欄、JSON保存/読込、PNG書出しを扱う。
-  // JSON形式を変える時は、validateMapとformatMapJsonを一緒に見る。
-
   function syncFields() {
     $("map-name").value = map.name;
     $("map-width").value = map.width;
@@ -982,13 +887,8 @@
     syncAppearanceControls();
     refreshJson();
   }
-  function refreshJson() {
-    $("json-text").value = formatMapJson(map);
-  }
-
-  function saveJson() {
-    download(new Blob([formatMapJson(map)], { type: "application/json" }), `${safeName(map.name)}.json`);
-  }
+  function refreshJson() { $("json-text").value = formatMapJson(map); }
+  function saveJson() { download(new Blob([formatMapJson(map)], { type: "application/json" }), `${safeName(map.name)}.json`); }
   function formatMapJson(value) {
     const { placements, ...meta } = value;
     const header = JSON.stringify(meta, null, 2).replace(/\n}$/, "");
@@ -1043,60 +943,18 @@
     out.restore();
     output.toBlob((blob) => download(blob, `${safeName(map.name)}.png`), "image/png");
   }
-
-  // ============================================================
-  // 11. 共通ユーティリティ
-  // ============================================================
-  // どの処理からも使う小さい道具置き場。
-
-  function download(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function safeName(name) {
-    return name.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-|-$/g, "") || "map";
-  }
-
-  function setStatus(message) {
-    $("status").textContent = message;
-  }
-
-  function clone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, Math.round(value || min)));
-  }
+  function download(blob, filename) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  function safeName(name) { return name.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-|-$/g, "") || "map"; }
+  function setStatus(text) { $("status").textContent = text; }
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function clamp(value, min, max) { return Math.min(max, Math.max(min, Math.round(value || min))); }
   function clampNumber(value, min, max, fallback) {
     const number = Number(value);
     return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback;
   }
-  function getCellSize() {
-    return clamp(Number(map.cellSize || CELL), 16, 128);
-  }
+  function getCellSize() { return clamp(Number(map.cellSize || CELL), 16, 128); }
 
-  function rect(g, x, y, w, h, fill, stroke = null, line = 1) {
-    g.fillStyle = fill;
-    g.fillRect(x, y, w, h);
-    if (!stroke) return;
-    g.strokeStyle = stroke;
-    g.lineWidth = line;
-    g.strokeRect(x + line / 2, y + line / 2, w - line, h - line);
-  }
-
-  // ============================================================
-  // 12. タイル描画関数
-  // ============================================================
-  // tiles定義のdrawから呼ばれるcanvas描画専用関数。
-  // 新しいパーツを増やす時は、tilesに定義を足して、ここにdraw関数を追加する。
-  // ここは見た目のコードなので、ゲーム本編の進行ロジックとは独立している。
-
+  function rect(g, x, y, w, h, fill, stroke = null, line = 1) { g.fillStyle = fill; g.fillRect(x, y, w, h); if (stroke) { g.strokeStyle = stroke; g.lineWidth = line; g.strokeRect(x + line / 2, y + line / 2, w - line, h - line); } }
   function drawFloor(g, x, y, w, h) { rect(g, x, y, w, h, "#77736b", "#59564f", 2); g.fillStyle = "rgba(255,255,255,.035)"; for (let i = 0; i < 8; i++) g.fillRect(x + (i * 19 + y) % w, y + (i * 31 + x) % h, 2, 2); }
   function drawFloorDark(g, x, y, w, h) { rect(g, x, y, w, h, "#55534e", "#42413d", 2); }
   function drawWallTop(g, x, y, w, h) { const grad = g.createLinearGradient(x, y, x, y + h); grad.addColorStop(0, "#a09b91"); grad.addColorStop(.18, "#6c6963"); grad.addColorStop(1, "#393a39"); rect(g, x, y, w, h, grad, "#222", 2); g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(x + 3, y + 4, w - 6, 5); }
