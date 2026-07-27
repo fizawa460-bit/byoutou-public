@@ -820,21 +820,118 @@
           const covered = isWindowSegmentCovered(placement, placement.x + segment);
           const segmentDepth = covered ? cell * .25 : depth;
           const segmentShift = shift * segmentDepth / Math.max(depth, 1);
-          const gradient = target.createLinearGradient(0, top + height, 0, top + height + segmentDepth);
-          gradient.addColorStop(0, `rgba(${lightColor}, ${(Math.min(1, daylight * .28 * intensity)).toFixed(3)})`);
-          gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
-          target.fillStyle = gradient;
-          target.beginPath();
-          target.moveTo(segmentLeft, top + height);
-          target.lineTo(segmentRight, top + height);
-          target.lineTo(segmentRight + segmentShift, top + height + segmentDepth);
-          target.lineTo(segmentLeft + segmentShift, top + height + segmentDepth);
-          target.closePath();
-          target.fill();
+          drawSunRayThroughBars(target, {
+            sourceLeft: segmentLeft,
+            sourceRight: segmentRight,
+            sourceY: top + height,
+            depth: segmentDepth,
+            shift: segmentShift,
+            lightColor,
+            alpha: Math.min(1, daylight * .28 * intensity),
+            cell
+          });
         }
       });
     }
     target.restore();
+  }
+
+  function drawSunRayThroughBars(target, ray) {
+    const endY = ray.sourceY + ray.depth;
+    const gradient = target.createLinearGradient(0, ray.sourceY, 0, endY);
+    gradient.addColorStop(0, `rgba(${ray.lightColor}, ${ray.alpha.toFixed(3)})`);
+    gradient.addColorStop(1, `rgba(${ray.lightColor}, 0)`);
+
+    const bars = findFirstBarsAcrossRay(ray);
+    if (!bars) {
+      fillRayQuad(target, gradient, ray.sourceLeft, ray.sourceRight, ray.sourceY, ray.sourceLeft + ray.shift, ray.sourceRight + ray.shift, endY);
+      return;
+    }
+
+    const topRatio = (bars.top - ray.sourceY) / ray.depth;
+    const topShift = ray.shift * topRatio;
+    fillRayQuad(
+      target,
+      gradient,
+      ray.sourceLeft,
+      ray.sourceRight,
+      ray.sourceY,
+      ray.sourceLeft + topShift,
+      ray.sourceRight + topShift,
+      bars.top
+    );
+
+    const bottomRatio = (bars.bottom - ray.sourceY) / ray.depth;
+    if (bottomRatio >= 1) return;
+    const projectedLeft = ray.sourceLeft + ray.shift * bottomRatio;
+    const projectedRight = ray.sourceRight + ray.shift * bottomRatio;
+    const remainingShift = ray.shift * (1 - bottomRatio);
+
+    bars.gaps.forEach((gap) => {
+      const gapLeft = Math.max(gap.left, projectedLeft);
+      const gapRight = Math.min(gap.right, projectedRight);
+      if (gapRight <= gapLeft) return;
+      fillRayQuad(
+        target,
+        gradient,
+        gapLeft,
+        gapRight,
+        bars.bottom,
+        gapLeft + remainingShift,
+        gapRight + remainingShift,
+        endY
+      );
+    });
+  }
+
+  function findFirstBarsAcrossRay(ray) {
+    return map.placements
+      .filter((placement) => placement.tile === "bars" && visibleLayers.has(placement.layer))
+      .map((placement) => {
+        const size = footprint(placement);
+        const left = placement.x * ray.cell;
+        const width = size.w * ray.cell;
+        const top = placement.y * ray.cell;
+        const bottom = (placement.y + size.h) * ray.cell;
+        if (top <= ray.sourceY || bottom >= ray.sourceY + ray.depth) return null;
+
+        const ratio = (top - ray.sourceY) / ray.depth;
+        const projectedLeft = ray.sourceLeft + ray.shift * ratio;
+        const projectedRight = ray.sourceRight + ray.shift * ratio;
+        if (projectedRight <= left || projectedLeft >= left + width) return null;
+
+        return { top, bottom, gaps: barsLightGaps(left, width, ray.cell) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.top - b.top)[0] || null;
+  }
+
+  function barsLightGaps(left, width, cell) {
+    const scale = cell / CELL;
+    const innerLeft = left + 8 * scale;
+    const innerRight = left + width - 8 * scale;
+    const halfBar = 5 * scale;
+    const centers = Array.from({ length: 8 }, (_, index) => left + (19 + index * ((width / scale - 38) / 7)) * scale);
+    const gaps = [];
+    let cursor = innerLeft;
+    centers.forEach((center) => {
+      const barLeft = Math.max(innerLeft, center - halfBar);
+      if (barLeft > cursor) gaps.push({ left: cursor, right: barLeft });
+      cursor = Math.min(innerRight, center + halfBar);
+    });
+    if (cursor < innerRight) gaps.push({ left: cursor, right: innerRight });
+    return gaps;
+  }
+
+  function fillRayQuad(target, fill, startLeft, startRight, startY, endLeft, endRight, endY) {
+    target.fillStyle = fill;
+    target.beginPath();
+    target.moveTo(startLeft, startY);
+    target.lineTo(startRight, startY);
+    target.lineTo(endRight, endY);
+    target.lineTo(endLeft, endY);
+    target.closePath();
+    target.fill();
   }
 
   function isWindowSegmentCovered(windowPlacement, segmentX) {
