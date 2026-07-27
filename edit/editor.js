@@ -941,7 +941,12 @@
     const projectedRight = ray.sourceRight + ray.shift * bottomRatio;
     const remainingShift = ray.shift * (1 - bottomRatio);
 
-    bars.gaps.forEach((gap) => {
+    const openings = [
+      { left: projectedLeft, right: Math.min(projectedRight, bars.left) },
+      ...bars.gaps,
+      { left: Math.max(projectedLeft, bars.right), right: projectedRight }
+    ];
+    openings.forEach((gap) => {
       const gapLeft = Math.max(gap.left, projectedLeft);
       const gapRight = Math.min(gap.right, projectedRight);
       if (gapRight <= gapLeft) return;
@@ -974,7 +979,13 @@
         const projectedRight = ray.sourceRight + ray.shift * ratio;
         if (projectedRight <= left || projectedLeft >= left + width) return null;
 
-        return { top, bottom, gaps: barsLightGaps(left, width, ray.cell) };
+        return {
+          top,
+          bottom,
+          left,
+          right: left + width,
+          gaps: barsLightGaps(left, width, ray.cell)
+        };
       })
       .filter(Boolean)
       .sort((a, b) => a.top - b.top)[0] || null;
@@ -1009,13 +1020,6 @@
   }
 
   function isWindowSegmentCovered(windowPlacement, segmentX) {
-    const passesThroughGlass = map.placements.some((placement) => {
-      if (placement.tile !== "bars" || footprint(placement).w !== 1 || placement.y <= windowPlacement.y) return false;
-      const size = footprint(placement);
-      return segmentX < placement.x + size.w && segmentX + 1 > placement.x;
-    });
-    if (passesThroughGlass) return false;
-
     const windowSize = footprint(windowPlacement);
     return map.placements.some((placement) => {
       if (placement.tile !== "curtain" || !visibleLayers.has(placement.layer)) return false;
