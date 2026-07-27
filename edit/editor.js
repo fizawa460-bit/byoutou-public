@@ -753,7 +753,7 @@
       ? 0
       : Math.sin(((hour - 5) / 14) * Math.PI);
     const intensity = sunlightIntensity / 100;
-    const darkness = .5 * (1 - Math.min(1, daylight * intensity));
+    const darkness = .5 * (1 - daylight);
     const cell = getCellSize();
 
     target.save();
