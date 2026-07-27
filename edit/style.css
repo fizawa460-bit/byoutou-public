@@ -83,6 +83,25 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
 }
 .nurse-test-button:hover { border-color: #88b3c6; background: #213640; }
 .nurse-test-button:disabled { cursor: wait; opacity: .55; }
+.toolbar .time-preview {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  width: min(230px, 100%);
+  min-height: 32px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #17191b;
+}
+.time-preview output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.time-preview input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 18px;
+  padding: 0;
+  accent-color: #e0c788;
+}
 .selection-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; width: 100%; padding-top: 7px; border-top: 1px solid var(--line); }
 .selection-tools > span { margin-right: 3px; color: var(--muted); font-size: 12px; }
 .selection-tools button { min-width: 38px; min-height: 34px; padding: 5px 9px; font-size: 12px; }

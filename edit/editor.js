@@ -234,6 +234,7 @@
   let nurseWalk = null;
   let nurseAnimationFrame = 0;
   let nurseHideTimer = 0;
+  let previewTimeMinutes = 12 * 60;
 
   // ============================================================
   // 5. 初期化
@@ -319,6 +320,7 @@
     $("picker").addEventListener("click", () => setMode("pick"));
     $("select-objects").addEventListener("click", () => setMode("select"));
     $("walk-nurse").addEventListener("click", startNurseWalk);
+    $("preview-time").addEventListener("input", updateTimePreview);
   }
 
   function bindSelectionControls() {
@@ -650,6 +652,7 @@
       drawPlacement(target, p);
     }));
     target.restore();
+    if (target === ctx) drawTimePreview(target);
     if (includeGrid) drawGrid(target);
     if (target === ctx && nurseWalk) drawNurse(target);
     if (target === ctx && selectedPlacements.size) drawSelection(target);
@@ -700,6 +703,67 @@
     target.shadowBlur = Math.max(3, cell * .08);
     target.shadowOffsetY = Math.max(2, cell * .04);
     target.drawImage(nurseSprite, nurseWalk.frame * 64, 0, 64, 64, x, y, size, size);
+    target.restore();
+  }
+
+  function updateTimePreview(event) {
+    previewTimeMinutes = Number(event.target.value);
+    $("preview-time-value").textContent = formatPreviewTime(previewTimeMinutes);
+    render();
+  }
+
+  function formatPreviewTime(minutes) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  function drawTimePreview(target) {
+    const hour = previewTimeMinutes / 60;
+    const daylight = hour <= 5 || hour >= 19
+      ? 0
+      : Math.sin(((hour - 5) / 14) * Math.PI);
+    const darkness = .5 * (1 - daylight);
+    const cell = getCellSize();
+
+    target.save();
+    target.fillStyle = `rgba(5, 10, 20, ${darkness.toFixed(3)})`;
+    target.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (daylight > .04 && visibleLayers.has("structure")) {
+      const warmth = Math.min(1, Math.abs(hour - 12) / 7);
+      const red = Math.round(246 + 9 * warmth);
+      const green = Math.round(238 - 35 * warmth);
+      const blue = Math.round(194 - 82 * warmth);
+      const lightColor = `${red}, ${green}, ${blue}`;
+      const shift = ((hour - 5) / 14 - .5) * cell * 5;
+      const depth = cell * (3.5 + daylight * 3);
+
+      map.placements.filter((placement) => placement.tile === "window").forEach((placement) => {
+        const size = footprint(placement);
+        const left = placement.x * cell;
+        const top = placement.y * cell;
+        const width = size.w * cell;
+        const height = size.h * cell;
+        const inset = Math.max(3, cell * .08);
+
+        target.globalCompositeOperation = "screen";
+        target.fillStyle = `rgba(${lightColor}, ${(daylight * .32).toFixed(3)})`;
+        target.fillRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
+
+        const gradient = target.createLinearGradient(0, top + height, 0, top + height + depth);
+        gradient.addColorStop(0, `rgba(${lightColor}, ${(daylight * .28).toFixed(3)})`);
+        gradient.addColorStop(1, `rgba(${lightColor}, 0)`);
+        target.fillStyle = gradient;
+        target.beginPath();
+        target.moveTo(left + inset, top + height);
+        target.lineTo(left + width - inset, top + height);
+        target.lineTo(left + width - inset + shift, top + height + depth);
+        target.lineTo(left + inset + shift, top + height + depth);
+        target.closePath();
+        target.fill();
+      });
+    }
     target.restore();
   }
 

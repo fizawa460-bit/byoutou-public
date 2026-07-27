@@ -59,6 +59,9 @@
         <button id="redo" type="button" title="やり直す">↷</button>
         <label class="grid-toggle"><input id="show-grid" type="checkbox" checked> グリッド</label>
         <button id="walk-nurse" type="button" class="nurse-test-button" title="看護師を歩かせる" aria-label="看護師を歩かせる">▶ 看</button>
+        <label class="time-preview">時間 <output id="preview-time-value" for="preview-time">12:00</output>
+          <input id="preview-time" type="range" min="0" max="1425" step="15" value="720" aria-label="日光プレビュー時刻">
+        </label>
         <div class="selection-tools" aria-label="複数選択した配置物の操作">
           <span id="selection-count">選択 0個</span>
           <button id="select-visible" type="button">編集中を全選択</button>
