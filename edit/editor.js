@@ -753,6 +753,7 @@
     target.save();
     target.fillStyle = `rgba(5, 10, 20, ${darkness.toFixed(3)})`;
     target.fillRect(0, 0, canvas.width, canvas.height);
+    drawRoomLighting(target, hour, cell);
 
     if (daylight > .04 && visibleLayers.has("structure")) {
       const warmth = Math.min(1, Math.abs(hour - 12) / 7);
@@ -803,6 +804,54 @@
       });
     }
     target.restore();
+  }
+
+  function drawRoomLighting(target, hour, cell) {
+    const centralBars = map.placements.filter((placement) => (
+      placement.tile === "bars"
+      && visibleLayers.has(placement.layer)
+      && footprint(placement).w > 1
+    ));
+    if (!centralBars.length) return;
+
+    const roomLight = smoothLightingStep(6.75, 7, hour);
+    if (roomLight > 0) {
+      const roomTop = Math.max(...centralBars.map((placement) => (placement.y + footprint(placement).h) * cell));
+      const roomLeft = cell;
+      const roomWidth = Math.max(0, (map.width - 2) * cell);
+      const roomHeight = Math.max(0, (map.height - 1) * cell - roomTop);
+      target.save();
+      target.globalCompositeOperation = "screen";
+      target.fillStyle = `rgba(244, 237, 214, ${(.38 * roomLight).toFixed(3)})`;
+      target.fillRect(roomLeft, roomTop, roomWidth, roomHeight);
+      target.restore();
+    }
+
+    const corridorSpill = smoothLightingStep(18, 18.5, hour);
+    if (corridorSpill <= 0) return;
+
+    target.save();
+    target.globalCompositeOperation = "screen";
+    centralBars.forEach((placement) => {
+      const size = footprint(placement);
+      const left = placement.x * cell;
+      const width = size.w * cell;
+      const barTop = placement.y * cell;
+      const lightTop = Math.max(0, barTop - cell * 2.25);
+      const gradient = target.createLinearGradient(0, barTop, 0, lightTop);
+      gradient.addColorStop(0, `rgba(244, 237, 214, ${(.34 * corridorSpill).toFixed(3)})`);
+      gradient.addColorStop(1, "rgba(244, 237, 214, 0)");
+      target.fillStyle = gradient;
+      barsLightGaps(left, width, cell).forEach((gap) => {
+        target.fillRect(gap.left, lightTop, gap.right - gap.left, barTop - lightTop);
+      });
+    });
+    target.restore();
+  }
+
+  function smoothLightingStep(start, end, value) {
+    const progress = Math.min(1, Math.max(0, (value - start) / (end - start)));
+    return (1 - Math.cos(Math.PI * progress)) / 2;
   }
 
   function drawSunRayThroughBars(target, ray) {
