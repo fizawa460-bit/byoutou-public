@@ -86,46 +86,16 @@
     width: 12,
     height: 15,
     placements: [
-      {"tile":"floor","x":0,"y":1,"layer":"floor"},
       {"tile":"floor","x":6,"y":1,"layer":"floor"},
       {"tile":"floor","x":7,"y":1,"layer":"floor"},
       {"tile":"floor","x":10,"y":1,"layer":"floor"},
-      {"tile":"floor","x":11,"y":1,"layer":"floor"},
       {"tile":"floor","x":0,"y":2,"layer":"floor"},
       {"tile":"floor","x":1,"y":2,"layer":"floor"},
       {"tile":"floor","x":2,"y":2,"layer":"floor"},
       {"tile":"floor","x":3,"y":2,"layer":"floor"},
       {"tile":"floor","x":11,"y":2,"layer":"floor"},
-      {"tile":"floor","x":0,"y":3,"layer":"floor"},
-      {"tile":"floor","x":1,"y":3,"layer":"floor"},
-      {"tile":"floor","x":2,"y":3,"layer":"floor"},
-      {"tile":"floor","x":3,"y":3,"layer":"floor"},
-      {"tile":"floor","x":4,"y":3,"layer":"floor"},
-      {"tile":"floor","x":5,"y":3,"layer":"floor"},
-      {"tile":"floor","x":6,"y":3,"layer":"floor"},
-      {"tile":"floor","x":7,"y":3,"layer":"floor"},
-      {"tile":"floor","x":8,"y":3,"layer":"floor"},
-      {"tile":"floor","x":9,"y":3,"layer":"floor"},
-      {"tile":"floor","x":10,"y":3,"layer":"floor"},
-      {"tile":"floor","x":11,"y":3,"layer":"floor"},
-      {"tile":"floor","x":0,"y":4,"layer":"floor"},
-      {"tile":"floor","x":11,"y":4,"layer":"floor"},
-      {"tile":"floor","x":0,"y":5,"layer":"floor"},
-      {"tile":"floor","x":11,"y":5,"layer":"floor"},
-      {"tile":"floor","x":0,"y":6,"layer":"floor"},
-      {"tile":"floor","x":11,"y":6,"layer":"floor"},
       {"tile":"floor","x":0,"y":7,"layer":"floor"},
-      {"tile":"floor","x":11,"y":7,"layer":"floor"},
-      {"tile":"floor","x":0,"y":8,"layer":"floor"},
-      {"tile":"floor","x":11,"y":8,"layer":"floor"},
-      {"tile":"floor","x":0,"y":9,"layer":"floor"},
-      {"tile":"floor","x":11,"y":9,"layer":"floor"},
-      {"tile":"floor","x":0,"y":10,"layer":"floor"},
-      {"tile":"floor","x":11,"y":10,"layer":"floor"},
-      {"tile":"floor","x":0,"y":11,"layer":"floor"},
-      {"tile":"floor","x":11,"y":11,"layer":"floor"},
       {"tile":"floor","x":0,"y":12,"layer":"floor"},
-      {"tile":"floor","x":11,"y":12,"layer":"floor"},
       {"tile":"floor","x":0,"y":13,"layer":"floor"},
       {"tile":"floor","x":11,"y":13,"layer":"floor"},
       {"tile":"wallTop","x":0,"y":3,"layer":"structure"},
@@ -164,11 +134,6 @@
       {"tile":"shadow","x":11,"y":11,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":12,"layer":"overlay"},
       {"tile":"toilet","x":10,"y":12,"layer":"fixture","rotation":90},
-      {"tile":"bars","x":1,"y":3,"layer":"structure","width":2,"height":1},
-      {"tile":"bars","x":3,"y":3,"layer":"structure","width":2,"height":1},
-      {"tile":"bars","x":5,"y":3,"layer":"structure","width":2,"height":1},
-      {"tile":"bars","x":7,"y":3,"layer":"structure","width":2,"height":1},
-      {"tile":"bars","x":9,"y":3,"layer":"structure","width":2,"height":1},
       {"tile":"window","x":1,"y":0,"layer":"structure","width":10,"height":1},
       {"tile":"curtain","x":10,"y":0,"layer":"fixture","width":1,"height":1},
       {"tile":"curtain","x":1,"y":0,"layer":"fixture","width":1,"height":1},
@@ -176,7 +141,6 @@
       {"tile":"wallTop","x":11,"y":0,"layer":"structure"},
       {"tile":"wallTop","x":0,"y":0,"layer":"structure"},
       {"tile":"doorSmall","x":0,"y":2,"layer":"structure","rotation":90},
-      {"tile":"futon","x":5,"y":6,"layer":"fixture"},
       {"tile":"wallSide","x":11,"y":1,"layer":"structure","rotation":0},
       {"tile":"wallSide","x":0,"y":4,"layer":"structure","rotation":0},
       {"tile":"wallSide","x":0,"y":1,"layer":"structure","rotation":0},
@@ -211,7 +175,12 @@
       {"tile":"floor","x":7,"y":9,"layer":"floor","width":4,"height":2},
       {"tile":"floorDark","x":9,"y":11,"layer":"floor","width":2,"height":1},
       {"tile":"floorDark","x":9,"y":12,"layer":"floor","width":2,"height":1},
-      {"tile":"floorDark","x":7,"y":11,"layer":"floor","width":2,"height":2}
+      {"tile":"floorDark","x":7,"y":11,"layer":"floor","width":2,"height":2},
+      {"tile":"futon","x":5,"y":6,"layer":"fixture"},
+      {"tile":"bars","x":10,"y":3,"layer":"structure","width":1,"height":1},
+      {"tile":"bars","x":1,"y":3,"layer":"structure","width":1,"height":1},
+      {"tile":"bars","x":2,"y":3,"layer":"structure","width":4,"height":1},
+      {"tile":"bars","x":6,"y":3,"layer":"structure","width":4,"height":1}
     ]
   };
 
@@ -886,7 +855,7 @@
 
   function findFirstBarsAcrossRay(ray) {
     return map.placements
-      .filter((placement) => placement.tile === "bars" && visibleLayers.has(placement.layer))
+      .filter((placement) => placement.tile === "bars" && visibleLayers.has(placement.layer) && footprint(placement).w > 1)
       .map((placement) => {
         const size = footprint(placement);
         const left = placement.x * ray.cell;
