@@ -127,6 +127,14 @@ button.danger:hover { border-color: #d76b6b; background: #3a1c1c; }
   padding: 0;
   accent-color: #e0c788;
 }
+.sunlight-color input[type="color"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 30px;
+  padding: 2px;
+  border-radius: 5px;
+  cursor: pointer;
+}
 body:not(.sunlight-mode) .sunlight-tools { display: none; }
 body.sunlight-mode .toolbar > :not(.editor-mode-switch):not(.sunlight-tools) { display: none; }
 body.sunlight-mode .palette-panel,
