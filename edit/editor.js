@@ -784,10 +784,20 @@
         target.fillStyle = `rgba(${lightColor}, ${(Math.min(1, daylight * .32 * intensity)).toFixed(3)})`;
         target.fillRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 
-        for (let segment = 0; segment < size.w; segment++) {
-          const segmentLeft = left + segment * cell + (segment === 0 ? inset : 0);
-          const segmentRight = Math.min(left + width - (segment === size.w - 1 ? inset : 0), left + (segment + 1) * cell);
+        for (let segment = 0; segment < size.w;) {
           const covered = isWindowSegmentCovered(placement, placement.x + segment);
+          let runEnd = segment + 1;
+          while (
+            runEnd < size.w
+            && isWindowSegmentCovered(placement, placement.x + runEnd) === covered
+          ) {
+            runEnd++;
+          }
+          const segmentLeft = left + segment * cell + (segment === 0 ? inset : 0);
+          const segmentRight = Math.min(
+            left + width - (runEnd === size.w ? inset : 0),
+            left + runEnd * cell
+          );
           const segmentDepth = covered ? cell * .25 : depth;
           const segmentShift = shift * segmentDepth / Math.max(depth, 1);
           drawSunRayThroughBars(target, {
@@ -800,6 +810,7 @@
             alpha: Math.min(1, daylight * .28 * intensity),
             cell
           });
+          segment = runEnd;
         }
       });
     }
@@ -927,7 +938,7 @@
         ray.sourceLeft + ray.shift,
         ray.sourceRight + ray.shift,
         endY,
-        ray.cell * .12
+        ray.cell * .1
       );
       return;
     }
@@ -943,7 +954,7 @@
       ray.sourceLeft + topShift,
       ray.sourceRight + topShift,
       bars.top,
-      ray.cell * .12
+      ray.cell * .1
     );
 
     const bottomRatio = (bars.bottom - ray.sourceY) / ray.depth;
@@ -970,7 +981,7 @@
         gapLeft + remainingShift,
         gapRight + remainingShift,
         endY,
-        ray.cell * .12
+        ray.cell * .06
       );
     });
   }
@@ -1021,27 +1032,35 @@
   }
 
   function fillRayQuad(target, fill, startLeft, startRight, startY, endLeft, endRight, endY, edgeFeather = 0) {
-    const maxInset = Math.max(0, Math.min(
+    const maxOutset = Math.max(0, Math.min(
       edgeFeather,
       (startRight - startLeft) * .45,
       (endRight - endLeft) * .45
     ));
-    const bands = maxInset > 0 ? 6 : 1;
+    const bands = maxOutset > 0 ? 5 : 0;
 
     target.save();
     target.fillStyle = fill;
-    for (let band = 0; band < bands; band++) {
-      const progress = bands === 1 ? 1 : band / (bands - 1);
-      const inset = maxInset * progress;
-      target.globalAlpha = bands === 1 ? 1 : .08 + .92 * progress * progress;
+    for (let band = bands; band > 0; band--) {
+      const progress = band / bands;
+      const outset = maxOutset * progress;
+      target.globalAlpha = .025 + .09 * (1 - progress);
       target.beginPath();
-      target.moveTo(startLeft + inset, startY);
-      target.lineTo(startRight - inset, startY);
-      target.lineTo(endRight - inset, endY);
-      target.lineTo(endLeft + inset, endY);
+      target.moveTo(startLeft - outset, startY);
+      target.lineTo(startRight + outset, startY);
+      target.lineTo(endRight + outset, endY);
+      target.lineTo(endLeft - outset, endY);
       target.closePath();
       target.fill();
     }
+    target.globalAlpha = 1;
+    target.beginPath();
+    target.moveTo(startLeft, startY);
+    target.lineTo(startRight, startY);
+    target.lineTo(endRight, endY);
+    target.lineTo(endLeft, endY);
+    target.closePath();
+    target.fill();
     target.restore();
   }
 
