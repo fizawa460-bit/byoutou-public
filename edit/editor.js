@@ -938,7 +938,7 @@
         ray.sourceLeft + ray.shift,
         ray.sourceRight + ray.shift,
         endY,
-        ray.cell * .1
+        ray.cell * .25
       );
       return;
     }
@@ -954,7 +954,7 @@
       ray.sourceLeft + topShift,
       ray.sourceRight + topShift,
       bars.top,
-      ray.cell * .1
+      ray.cell * .25
     );
 
     const bottomRatio = (bars.bottom - ray.sourceY) / ray.depth;
@@ -987,7 +987,7 @@
   }
 
   function findFirstBarsAcrossRay(ray) {
-    return map.placements
+    const candidates = map.placements
       .filter((placement) => placement.tile === "bars" && visibleLayers.has(placement.layer) && footprint(placement).w > 1)
       .map((placement) => {
         const size = footprint(placement);
@@ -1002,16 +1002,21 @@
         const projectedRight = ray.sourceRight + ray.shift * ratio;
         if (projectedRight <= left || projectedLeft >= left + width) return null;
 
-        return {
-          top,
-          bottom,
-          left,
-          right: left + width,
-          gaps: barsLightGaps(left, width, ray.cell)
-        };
+        return { top, bottom, left, right: left + width, gaps: barsLightGaps(left, width, ray.cell) };
       })
       .filter(Boolean)
-      .sort((a, b) => a.top - b.top)[0] || null;
+      .sort((a, b) => a.top - b.top);
+
+    if (!candidates.length) return null;
+    const firstTop = candidates[0].top;
+    const sameRow = candidates.filter((candidate) => Math.abs(candidate.top - firstTop) < .5);
+    return {
+      top: firstTop,
+      bottom: Math.max(...sameRow.map((candidate) => candidate.bottom)),
+      left: Math.min(...sameRow.map((candidate) => candidate.left)),
+      right: Math.max(...sameRow.map((candidate) => candidate.right)),
+      gaps: sameRow.flatMap((candidate) => candidate.gaps)
+    };
   }
 
   function barsLightGaps(left, width, cell) {
