@@ -817,7 +817,9 @@
             shift: segmentShift,
             lightColor,
             alpha: Math.min(1, daylight * .28 * intensity),
-            cell
+            cell,
+            edgeFeatherLeft: run.edgeFeatherLeft,
+            edgeFeatherRight: run.edgeFeatherRight
           });
         });
       });
@@ -945,7 +947,7 @@
         ray.sourceLeft + ray.shift,
         ray.sourceRight + ray.shift,
         endY,
-        ray.cell * .25
+        { left: ray.edgeFeatherLeft, right: ray.edgeFeatherRight }
       );
       return;
     }
@@ -961,7 +963,7 @@
       ray.sourceLeft + topShift,
       ray.sourceRight + topShift,
       bars.top,
-      ray.cell * .25
+      { left: ray.edgeFeatherLeft, right: ray.edgeFeatherRight }
     );
 
     const bottomRatio = (bars.bottom - ray.sourceY) / ray.depth;
@@ -1054,24 +1056,32 @@
   }
 
   function fillRayQuad(target, fill, startLeft, startRight, startY, endLeft, endRight, endY, edgeFeather = 0) {
-    const maxOutset = Math.max(0, Math.min(
-      edgeFeather,
+    const requestedLeft = typeof edgeFeather === "number" ? edgeFeather : edgeFeather.left || 0;
+    const requestedRight = typeof edgeFeather === "number" ? edgeFeather : edgeFeather.right || 0;
+    const maxLeftOutset = Math.max(0, Math.min(
+      requestedLeft,
       (startRight - startLeft) * .45,
       (endRight - endLeft) * .45
     ));
-    const bands = maxOutset > 0 ? 5 : 0;
+    const maxRightOutset = Math.max(0, Math.min(
+      requestedRight,
+      (startRight - startLeft) * .45,
+      (endRight - endLeft) * .45
+    ));
+    const bands = Math.max(maxLeftOutset, maxRightOutset) > 0 ? 5 : 0;
 
     target.save();
     target.fillStyle = fill;
     for (let band = bands; band > 0; band--) {
       const progress = band / bands;
-      const outset = maxOutset * progress;
+      const leftOutset = maxLeftOutset * progress;
+      const rightOutset = maxRightOutset * progress;
       target.globalAlpha = .025 + .09 * (1 - progress);
       target.beginPath();
-      target.moveTo(startLeft - outset, startY);
-      target.lineTo(startRight + outset, startY);
-      target.lineTo(endRight + outset, endY);
-      target.lineTo(endLeft - outset, endY);
+      target.moveTo(startLeft - leftOutset, startY);
+      target.lineTo(startRight + rightOutset, startY);
+      target.lineTo(endRight + rightOutset, endY);
+      target.lineTo(endLeft - leftOutset, endY);
       target.closePath();
       target.fill();
     }
@@ -1131,6 +1141,13 @@
       runs.push({ start, end, depth });
       start = end;
     }
+    runs.forEach((run, index) => {
+      const isOpen = run.depth === defaultDepth;
+      const previousIsLimited = index > 0 && runs[index - 1].depth < defaultDepth;
+      const nextIsLimited = index < runs.length - 1 && runs[index + 1].depth < defaultDepth;
+      run.edgeFeatherLeft = isOpen && previousIsLimited ? cell * .25 : 0;
+      run.edgeFeatherRight = isOpen && nextIsLimited ? cell * .25 : 0;
+    });
     return runs;
   }
 
