@@ -45,6 +45,8 @@
   // w/h: 標準の配置マス数
   // draw: 実際にcanvasへ描く関数
   // rotations: 選べる向き。未指定なら回転なし。
+  // sunlight: 日光計算での役割。判定をタイル名の分岐へ散らさない。
+  // castsShadow: false の設備は室内照明の影を落とさない。
 
   const tiles = {
     floor: { name: "床", layer: "floor", w: 1, h: 1, draw: drawFloor },
@@ -52,17 +54,32 @@
     wallTop: { name: "上壁", layer: "structure", w: 1, h: 1, draw: drawWallTop },
     peekWindow: { name: "覗き小窓", layer: "structure", w: 1, h: 1, draw: drawPeekWindow },
     wallSide: { name: "側壁", layer: "structure", w: 1, h: 1, draw: drawWallSide, rotations: [0, 45, 90, 135] },
-    bars: { name: "鉄格子窓", layer: "structure", w: 3, h: 1, draw: drawBars },
+    bars: {
+      name: "鉄格子窓",
+      layer: "structure",
+      w: 3,
+      h: 1,
+      draw: drawBars,
+      sunlight: { splitMinWidth: 2, gapPattern: barsLightGaps }
+    },
     rail: { name: "レール", layer: "structure", w: 3, h: 1, draw: drawRailH, rotations: [0, 45, 90, 135] },
     railEdge: { name: "端寄せレール", layer: "structure", w: 3, h: 1, draw: drawRailEdge, rotations: [0, 90, 180, 270] },
     door: { name: "保護室ドア", layer: "structure", w: 2, h: 1, draw: drawDoor, rotations: [0, 45, 90, 135] },
     doorSmall: { name: "1マスドア", layer: "structure", w: 1, h: 1, draw: drawDoorSmall, rotations: [0, 90, 180, 270] },
-    mealHatchClosed: { name: "配膳口・閉", layer: "fixture", w: 1, h: 1, draw: drawMealHatchClosed, rotations: [0, 90, 180, 270] },
-    mealHatchOpen: { name: "配膳口・開", layer: "fixture", w: 1, h: 1, draw: drawMealHatchOpen, rotations: [0, 90, 180, 270] },
-    window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow },
+    mealHatchClosed: { name: "配膳口・閉", layer: "fixture", w: 1, h: 1, draw: drawMealHatchClosed, rotations: [0, 90, 180, 270], castsShadow: false },
+    mealHatchOpen: { name: "配膳口・開", layer: "fixture", w: 1, h: 1, draw: drawMealHatchOpen, rotations: [0, 90, 180, 270], castsShadow: false },
+    window: { name: "横長の窓", layer: "structure", w: 9, h: 1, draw: drawWindow, sunlight: { source: true } },
     futon: { name: "布団", layer: "fixture", w: 2, h: 3, draw: drawFuton },
     table: { name: "食事台", layer: "fixture", w: 1, h: 2, draw: drawTable, rotations: [0, 45, 90, 135] },
-    curtain: { name: "横長のカーテン", layer: "fixture", w: 9, h: 1, draw: drawCurtain },
+    curtain: {
+      name: "横長のカーテン",
+      layer: "fixture",
+      w: 9,
+      h: 1,
+      draw: drawCurtain,
+      sunlight: { maxDepthCells: .25 },
+      castsShadow: false
+    },
     toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
     sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
     mealTray: { name: "食事トレー", layer: "overlay", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
@@ -772,7 +789,7 @@
       const automaticLength = sunlightLengthAtHour(hour);
       const depth = cell * 6 * automaticLength * sunlightLength / 100;
 
-      map.placements.filter((placement) => placement.tile === "window").forEach((placement) => {
+      map.placements.filter(isSunlightSource).forEach((placement) => {
         const size = footprint(placement);
         const left = placement.x * cell;
         const top = placement.y * cell;
@@ -784,21 +801,13 @@
         target.fillStyle = `rgba(${lightColor}, ${(Math.min(1, daylight * .32 * intensity)).toFixed(3)})`;
         target.fillRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 
-        for (let segment = 0; segment < size.w;) {
-          const covered = isWindowSegmentCovered(placement, placement.x + segment);
-          let runEnd = segment + 1;
-          while (
-            runEnd < size.w
-            && isWindowSegmentCovered(placement, placement.x + runEnd) === covered
-          ) {
-            runEnd++;
-          }
-          const segmentLeft = left + segment * cell + (segment === 0 ? inset : 0);
+        getSunlightRuns(placement, depth, cell).forEach((run) => {
+          const segmentLeft = left + run.start * cell + (run.start === 0 ? inset : 0);
           const segmentRight = Math.min(
-            left + width - (runEnd === size.w ? inset : 0),
-            left + runEnd * cell
+            left + width - (run.end === size.w ? inset : 0),
+            left + run.end * cell
           );
-          const segmentDepth = covered ? cell * .25 : depth;
+          const segmentDepth = run.depth;
           const segmentShift = shift * segmentDepth / Math.max(depth, 1);
           drawSunRayThroughBars(target, {
             sourceLeft: segmentLeft,
@@ -810,19 +819,14 @@
             alpha: Math.min(1, daylight * .28 * intensity),
             cell
           });
-          segment = runEnd;
-        }
+        });
       });
     }
     target.restore();
   }
 
   function drawRoomLighting(target, hour, cell) {
-    const centralBars = map.placements.filter((placement) => (
-      placement.tile === "bars"
-      && visibleLayers.has(placement.layer)
-      && footprint(placement).w > 1
-    ));
+    const centralBars = map.placements.filter(isSunlightSplitter);
     if (!centralBars.length) return;
 
     const roomLight = smoothLightingStep(6.75, 7, hour);
@@ -875,7 +879,7 @@
   }
 
   function drawEquipmentShadows(target, lighting) {
-    const ignoredTiles = new Set(["curtain", "mealHatchClosed", "mealHatchOpen"]);
+    if (!visibleLayers.has("fixture")) return;
     target.save();
     target.beginPath();
     target.rect(lighting.roomLeft, lighting.roomTop, lighting.roomWidth, lighting.roomHeight);
@@ -885,7 +889,10 @@
     target.fillStyle = `rgba(22, 20, 18, ${(.17 * lighting.roomLight).toFixed(3)})`;
 
     map.placements
-      .filter((placement) => placement.layer === "fixture" && !ignoredTiles.has(placement.tile))
+      .filter((placement) => (
+        placement.layer === "fixture"
+        && tiles[placement.tile]?.castsShadow !== false
+      ))
       .forEach((placement) => {
         const size = footprint(placement);
         const x = placement.x * lighting.cell;
@@ -927,7 +934,7 @@
     gradient.addColorStop(0, `rgba(${ray.lightColor}, ${ray.alpha.toFixed(3)})`);
     gradient.addColorStop(1, `rgba(${ray.lightColor}, 0)`);
 
-    const bars = findFirstBarsAcrossRay(ray);
+    const bars = findFirstSunlightSplitterRow(ray);
     if (!bars) {
       fillRayQuad(
         target,
@@ -986,9 +993,9 @@
     });
   }
 
-  function findFirstBarsAcrossRay(ray) {
-    const candidates = map.placements
-      .filter((placement) => placement.tile === "bars" && visibleLayers.has(placement.layer) && footprint(placement).w > 1)
+  function collectSunlightSplittersAcrossRay(ray) {
+    return map.placements
+      .filter(isSunlightSplitter)
       .map((placement) => {
         const size = footprint(placement);
         const left = placement.x * ray.cell;
@@ -1002,11 +1009,21 @@
         const projectedRight = ray.sourceRight + ray.shift * ratio;
         if (projectedRight <= left || projectedLeft >= left + width) return null;
 
-        return { top, bottom, left, right: left + width, gaps: barsLightGaps(left, width, ray.cell) };
+        const gapPattern = tiles[placement.tile]?.sunlight?.gapPattern;
+        return {
+          top,
+          bottom,
+          left,
+          right: left + width,
+          gaps: typeof gapPattern === "function" ? gapPattern(left, width, ray.cell) : []
+        };
       })
       .filter(Boolean)
       .sort((a, b) => a.top - b.top);
+  }
 
+  function findFirstSunlightSplitterRow(ray) {
+    const candidates = collectSunlightSplittersAcrossRay(ray);
     if (!candidates.length) return null;
     const firstTop = candidates[0].top;
     const sameRow = candidates.filter((candidate) => Math.abs(candidate.top - firstTop) < .5);
@@ -1069,16 +1086,52 @@
     target.restore();
   }
 
-  function isWindowSegmentCovered(windowPlacement, segmentX) {
-    const windowSize = footprint(windowPlacement);
-    return map.placements.some((placement) => {
-      if (placement.tile !== "curtain" || !visibleLayers.has(placement.layer)) return false;
-      const curtainSize = footprint(placement);
-      const overlapsX = segmentX < placement.x + curtainSize.w && segmentX + 1 > placement.x;
-      const overlapsY = windowPlacement.y < placement.y + curtainSize.h
-        && windowPlacement.y + windowSize.h > placement.y;
-      return overlapsX && overlapsY;
-    });
+  function isSunlightSource(placement) {
+    return visibleLayers.has(placement.layer)
+      && tiles[placement.tile]?.sunlight?.source === true;
+  }
+
+  function isSunlightSplitter(placement) {
+    const rules = tiles[placement.tile]?.sunlight;
+    return visibleLayers.has(placement.layer)
+      && Number.isFinite(rules?.splitMinWidth)
+      && footprint(placement).w >= rules.splitMinWidth;
+  }
+
+  function sunlightDepthAtSegment(sourcePlacement, segmentX, defaultDepth, cell) {
+    const sourceSize = footprint(sourcePlacement);
+    const limits = map.placements
+      .filter((placement) => (
+        visibleLayers.has(placement.layer)
+        && Number.isFinite(tiles[placement.tile]?.sunlight?.maxDepthCells)
+      ))
+      .filter((placement) => {
+        const size = footprint(placement);
+        const overlapsX = segmentX < placement.x + size.w && segmentX + 1 > placement.x;
+        const overlapsY = sourcePlacement.y < placement.y + size.h
+          && sourcePlacement.y + sourceSize.h > placement.y;
+        return overlapsX && overlapsY;
+      })
+      .map((placement) => tiles[placement.tile].sunlight.maxDepthCells * cell);
+    return limits.length ? Math.min(defaultDepth, ...limits) : defaultDepth;
+  }
+
+  function getSunlightRuns(sourcePlacement, defaultDepth, cell) {
+    const size = footprint(sourcePlacement);
+    const runs = [];
+    for (let start = 0; start < size.w;) {
+      const depth = sunlightDepthAtSegment(sourcePlacement, sourcePlacement.x + start, defaultDepth, cell);
+      let end = start + 1;
+      while (
+        end < size.w
+        && sunlightDepthAtSegment(sourcePlacement, sourcePlacement.x + end, defaultDepth, cell) === depth
+      ) {
+        end++;
+      }
+      runs.push({ start, end, depth });
+      start = end;
+    }
+    return runs;
   }
 
   function drawSelection(target) {
