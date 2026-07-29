@@ -918,7 +918,17 @@
 
     const bars = findFirstBarsAcrossRay(ray);
     if (!bars) {
-      fillRayQuad(target, gradient, ray.sourceLeft, ray.sourceRight, ray.sourceY, ray.sourceLeft + ray.shift, ray.sourceRight + ray.shift, endY);
+      fillRayQuad(
+        target,
+        gradient,
+        ray.sourceLeft,
+        ray.sourceRight,
+        ray.sourceY,
+        ray.sourceLeft + ray.shift,
+        ray.sourceRight + ray.shift,
+        endY,
+        ray.cell * .12
+      );
       return;
     }
 
@@ -932,7 +942,8 @@
       ray.sourceY,
       ray.sourceLeft + topShift,
       ray.sourceRight + topShift,
-      bars.top
+      bars.top,
+      ray.cell * .12
     );
 
     const bottomRatio = (bars.bottom - ray.sourceY) / ray.depth;
@@ -958,7 +969,8 @@
         bars.bottom,
         gapLeft + remainingShift,
         gapRight + remainingShift,
-        endY
+        endY,
+        ray.cell * .12
       );
     });
   }
@@ -1008,15 +1020,29 @@
     return gaps;
   }
 
-  function fillRayQuad(target, fill, startLeft, startRight, startY, endLeft, endRight, endY) {
+  function fillRayQuad(target, fill, startLeft, startRight, startY, endLeft, endRight, endY, edgeFeather = 0) {
+    const maxInset = Math.max(0, Math.min(
+      edgeFeather,
+      (startRight - startLeft) * .45,
+      (endRight - endLeft) * .45
+    ));
+    const bands = maxInset > 0 ? 6 : 1;
+
+    target.save();
     target.fillStyle = fill;
-    target.beginPath();
-    target.moveTo(startLeft, startY);
-    target.lineTo(startRight, startY);
-    target.lineTo(endRight, endY);
-    target.lineTo(endLeft, endY);
-    target.closePath();
-    target.fill();
+    for (let band = 0; band < bands; band++) {
+      const progress = bands === 1 ? 1 : band / (bands - 1);
+      const inset = maxInset * progress;
+      target.globalAlpha = bands === 1 ? 1 : .08 + .92 * progress * progress;
+      target.beginPath();
+      target.moveTo(startLeft + inset, startY);
+      target.lineTo(startRight - inset, startY);
+      target.lineTo(endRight - inset, endY);
+      target.lineTo(endLeft + inset, endY);
+      target.closePath();
+      target.fill();
+    }
+    target.restore();
   }
 
   function isWindowSegmentCovered(windowPlacement, segmentX) {
