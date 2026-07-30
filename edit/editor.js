@@ -836,7 +836,9 @@
       const roomTop = Math.max(...centralBars.map((placement) => (placement.y + footprint(placement).h) * cell));
       const roomLeft = cell;
       const roomWidth = Math.max(0, (map.width - 2) * cell);
-      const roomHeight = Math.max(0, (map.height - 1) * cell - roomTop);
+      // 最下部の通路床と、その1段上の壁列は室内の主照明に含めない。
+      const roomBottom = Math.max(roomTop, (map.height - 2) * cell);
+      const roomHeight = Math.max(0, roomBottom - roomTop);
       const lightX = roomLeft + roomWidth / 2;
       const lightY = roomTop + roomHeight / 2;
       const radius = Math.max(roomWidth, roomHeight) * .72;
@@ -855,6 +857,7 @@
       target.lineWidth = Math.max(3, cell * .1);
       target.strokeRect(roomLeft + 2, roomTop + 2, roomWidth - 4, roomHeight - 4);
       target.restore();
+      drawRoomWallReflections(target, { centralBars, roomTop, roomHeight, roomLight, cell });
       drawEquipmentShadows(target, { roomLeft, roomTop, roomWidth, roomHeight, lightX, lightY, radius, roomLight, cell });
     }
 
@@ -876,6 +879,34 @@
       barsLightGaps(left, width, cell).forEach((gap) => {
         target.fillRect(gap.left, lightTop, gap.right - gap.left, barTop - lightTop);
       });
+    });
+    target.restore();
+  }
+
+  function drawRoomWallReflections(target, lighting) {
+    target.save();
+    target.globalCompositeOperation = "screen";
+
+    // 側壁は床からの弱い反射光だけを受ける。
+    target.fillStyle = `rgba(244, 237, 214, ${(.035 * lighting.roomLight).toFixed(3)})`;
+    target.fillRect(0, lighting.roomTop, lighting.cell, lighting.roomHeight);
+    target.fillRect(
+      (map.width - 1) * lighting.cell,
+      lighting.roomTop,
+      lighting.cell,
+      lighting.roomHeight
+    );
+
+    // 鉄格子側も主照明ではなく、さらに弱い反射光に留める。
+    target.fillStyle = `rgba(244, 237, 214, ${(.025 * lighting.roomLight).toFixed(3)})`;
+    lighting.centralBars.forEach((placement) => {
+      const size = footprint(placement);
+      target.fillRect(
+        placement.x * lighting.cell,
+        placement.y * lighting.cell,
+        size.w * lighting.cell,
+        size.h * lighting.cell
+      );
     });
     target.restore();
   }
