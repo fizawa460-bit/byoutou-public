@@ -1,6 +1,6 @@
 extends Node3D
 
-signal build_finished(map_name: String, warnings: PackedStringArray)
+signal build_finished(map_name: String, warnings: PackedStringArray, generated_count: int)
 
 @export_file("*.json") var map_json_path := "res://maps/hard_room_v1.json"
 @export var cell_meters := 1.0
@@ -9,6 +9,7 @@ signal build_finished(map_name: String, warnings: PackedStringArray)
 
 var warnings := PackedStringArray()
 var materials: Dictionary = {}
+var generated_count := 0
 
 func _ready() -> void:
     call_deferred("_load_and_build")
@@ -17,10 +18,10 @@ func _load_and_build() -> void:
     _make_materials()
     var map := _load_map(map_json_path)
     if map.is_empty():
-        build_finished.emit("load failed", warnings)
+        build_finished.emit("load failed", warnings, generated_count)
         return
     _build_map(map)
-    build_finished.emit(str(map.get("name", "unnamed")), warnings)
+    build_finished.emit(str(map.get("name", "unnamed")), warnings, generated_count)
 
 func _load_map(path: String) -> Dictionary:
     if not FileAccess.file_exists(path):
@@ -83,6 +84,7 @@ func _center(x: float, y: float, w: float, h: float, elevation := 0.0) -> Vector
     return Vector3((x + w * 0.5) * cell_meters, elevation, (y + h * 0.5) * cell_meters)
 
 func _box(name: String, position: Vector3, size: Vector3, material: Material, collision := false, rotation_y := 0.0) -> StaticBody3D:
+    generated_count += 1
     var body := StaticBody3D.new()
     body.name = name
     body.position = position
@@ -167,14 +169,14 @@ func _add_environment_lights(width: int, height: int) -> void:
     env.background_mode = Environment.BG_COLOR
     env.background_color = Color("101217")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("7f8a92")
-    env.ambient_light_energy = 0.18
+    env.ambient_light_color = Color("b8c0c5")
+    env.ambient_light_energy = 0.65
     environment.environment = env
     add_child(environment)
     var artificial := OmniLight3D.new()
     artificial.position = Vector3(width * 0.5 * cell_meters, 2.35, height * 0.58 * cell_meters)
     artificial.light_color = Color("fff1d2")
-    artificial.light_energy = 4.0
+    artificial.light_energy = 7.0
     artificial.omni_range = max(width, height) * 0.62 * cell_meters
     artificial.shadow_enabled = true
     add_child(artificial)
@@ -184,7 +186,7 @@ func _add_environment_lights(width: int, height: int) -> void:
     sun.light_energy = 1.3
     sun.shadow_enabled = true
     add_child(sun)
-    warnings.append("日光は2Dと同じ演出用近似。JSONには時刻・強度・長さ補正が保存されないためPoC既定値を使用")
+    warnings.append("Sunlight uses PoC defaults because time/intensity are not stored in JSON.")
 
 func _sun_yaw(hour: float) -> float:
     return lerp(-55.0, 55.0, clamp((hour - 7.0) / 10.0, 0.0, 1.0))
