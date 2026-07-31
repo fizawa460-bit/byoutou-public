@@ -1,6 +1,7 @@
 extends Node3D
 
 signal build_finished(map_name: String, warnings: PackedStringArray, generated_count: int)
+signal build_progress(stage: String)
 
 @export_file("*.json") var map_json_path := "res://maps/hard_room_v1.json"
 @export var cell_meters := 1.0
@@ -11,15 +12,15 @@ var warnings := PackedStringArray()
 var materials: Dictionary = {}
 var generated_count := 0
 
-func _ready() -> void:
-    call_deferred("_load_and_build")
-
-func _load_and_build() -> void:
+func start_build() -> void:
+    build_progress.emit("Preparing materials...")
     _make_materials()
+    build_progress.emit("Loading JSON...")
     var map := _load_map(map_json_path)
     if map.is_empty():
         build_finished.emit("load failed", warnings, generated_count)
         return
+    build_progress.emit("Generating 3D map...")
     _build_map(map)
     build_finished.emit(str(map.get("name", "unnamed")), warnings, generated_count)
 
@@ -43,7 +44,8 @@ func _build_map(map: Dictionary) -> void:
         warnings.append("width / height が不正です")
         return
     _add_ceiling(width, height)
-    for raw in map.placements:
+    var placements: Array = map.get("placements", [])
+    for raw in placements:
         if typeof(raw) != TYPE_DICTIONARY:
             continue
         _build_placement(raw)
