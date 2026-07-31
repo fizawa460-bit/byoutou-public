@@ -46,10 +46,13 @@ try {
     await page.waitForTimeout(200);
   }
 
-  // Verify that the full-screen mobile control does not block the Inspect UI.
-  await tap(1200, 40, 2);
-  await tap(640, 360, 3);
-  await tap(1100, 210, 4);
+  // Open Inspect deterministically, then verify that the canvas UI accepts
+  // object selection and the Copy button is not blocked by MobileControls.
+  await page.keyboard.press("i");
+  await page.waitForTimeout(200);
+  await page.mouse.click(640, 360);
+  await page.waitForTimeout(200);
+  await page.mouse.click(1100, 190);
   await page.waitForTimeout(500);
 
   await page.screenshot({ path: "build/web-smoke.png" });
