@@ -94,8 +94,17 @@ func _copy_inspection() -> void:
     if _last_inspection_text.is_empty():
         inspect_label.text = "Select a generated part first."
         return
-    DisplayServer.clipboard_set(_last_inspection_text)
-    inspect_label.text += "\nCopied."
+    # Web clipboard access must run directly from the button's user gesture.
+    # JavaScriptBridge is more reliable than DisplayServer.clipboard_set on iOS browsers.
+    if OS.has_feature("web"):
+        var encoded_text := JSON.stringify(_last_inspection_text)
+        JavaScriptBridge.eval("navigator.clipboard.writeText(%s)" % encoded_text)
+    else:
+        DisplayServer.clipboard_set(_last_inspection_text)
+    copy_button.text = "Copied!"
+    inspect_label.text += "\nCopied. Paste it into ChatGPT."
+    print("INSPECTION_COPY_REQUESTED")
+    get_tree().create_timer(1.5).timeout.connect(func(): copy_button.text = "Copy request")
 
 func _show_startup_error(message: String) -> void:
     _build_reported = true
