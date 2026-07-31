@@ -6,13 +6,24 @@ extends Node3D
 var _build_reported := false
 
 func _ready() -> void:
-    info_label.text = "Loading JSON map..."
-    world.build_finished.connect(_on_build_finished)
-    world.build_progress.connect(_on_build_progress)
-    # The parent owns startup so Web builds cannot emit build_finished before
-    # this script has connected its handlers.
+    info_label.text = "Connecting map builder..."
+    if not world.has_signal("build_finished") or not world.has_signal("build_progress"):
+        _show_startup_error("World map builder signals are unavailable.")
+        return
+    world.connect("build_finished", Callable(self, "_on_build_finished"))
+    world.connect("build_progress", Callable(self, "_on_build_progress"))
+    info_label.text = "Starting map builder..."
+    if not world.has_method("start_build"):
+        _show_startup_error("World map builder start method is unavailable.")
+        return
+    # Connect first, then defer startup until every scene node is ready.
     world.call_deferred("start_build")
     get_tree().create_timer(8.0).timeout.connect(_on_build_timeout)
+
+func _show_startup_error(message: String) -> void:
+    _build_reported = true
+    info_label.text = "ERROR: 3D map startup failed."
+    warnings_label.text = message
 
 func _on_build_progress(stage: String) -> void:
     info_label.text = stage
