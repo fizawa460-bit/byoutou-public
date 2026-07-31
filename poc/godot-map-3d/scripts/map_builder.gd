@@ -129,9 +129,9 @@ func _window(x: float, y: float, w: float, h: float, rotation: float) -> void:
 func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var horizontal := int(rotation) % 180 == 0
     var span := w * cell_meters if horizontal else h * cell_meters
-    var count := max(2, int(span / 0.28))
+    var count: int = maxi(2, int(span / 0.28))
     for i in range(count + 1):
-        var offset := -span * 0.5 + span * float(i) / count
+        var offset: float = -span * 0.5 + span * float(i) / float(count)
         var pos := _center(x, y, w, h, wall_height * 0.5)
         pos += Vector3(offset, 0, 0) if horizontal else Vector3(0, 0, offset)
         _box("Bar", pos, Vector3(0.045, wall_height, 0.06) if horizontal else Vector3(0.06, wall_height, 0.045), materials.metal, true)
@@ -156,7 +156,7 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
 
 func _rail(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var horizontal := int(rotation) % 180 == 0
-    var span := max(w, h) * cell_meters
+    var span: float = maxf(w, h) * cell_meters
     _box("Rail", _center(x, y, w, h, 1.0), Vector3(span, 0.06, 0.06) if horizontal else Vector3(0.06, 0.06, span), materials.metal, false, deg_to_rad(rotation if int(rotation) % 45 == 0 else 0))
 
 func _meal_hatch(x: float, y: float, rotation: float) -> void:
