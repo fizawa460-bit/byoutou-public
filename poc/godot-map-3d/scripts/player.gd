@@ -4,7 +4,7 @@ extends CharacterBody3D
 @export var mouse_sensitivity := 0.0022
 @export var gravity := 18.0
 @onready var head: Node3D = $Head
-@onready var mobile_controls: Control = get_node_or_null("../HUD/MobileControls")
+@onready var mobile_controls = get_node_or_null("../HUD/MobileControls")
 
 func _ready() -> void:
     if not DisplayServer.is_touchscreen_available() and not OS.has_feature("mobile"):
