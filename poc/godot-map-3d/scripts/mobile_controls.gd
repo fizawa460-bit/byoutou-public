@@ -63,4 +63,4 @@ func _draw() -> void:
     draw_circle(base, stick_radius, Color(0.08, 0.09, 0.11, 0.38))
     draw_arc(base, stick_radius, 0.0, TAU, 48, Color(0.9, 0.9, 0.86, 0.55), 3.0)
     draw_circle(knob, 30.0, Color(0.85, 0.85, 0.8, 0.48))
-    draw_string(ThemeDB.fallback_font, Vector2(size.x - 180.0, size.y - 42.0), "右側スワイプ：視点", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.9, 0.9, 0.86, 0.62))
+    draw_string(ThemeDB.fallback_font, Vector2(size.x - 180.0, size.y - 42.0), "Swipe right side: look", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.9, 0.9, 0.86, 0.62))
