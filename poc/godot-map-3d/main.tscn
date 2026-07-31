@@ -17,7 +17,7 @@ script = ExtResource("2")
 map_json_path = "res://maps/hard_room_v1.json"
 
 [node name="Player" type="CharacterBody3D" parent="."]
-position = Vector3(6.0, 0.2, 11.8)
+position = Vector3(6.0, 0.08, 11.2)
 script = ExtResource("3")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
@@ -25,7 +25,8 @@ position = Vector3(0, 0.85, 0)
 shape = SubResource("Capsule")
 
 [node name="Head" type="Node3D" parent="Player"]
-position = Vector3(0, 1.55, 0)
+position = Vector3(0, 1.62, 0)
+rotation = Vector3(-0.08, 0, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Player/Head"]
 current = true
