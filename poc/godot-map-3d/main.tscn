@@ -51,6 +51,46 @@ offset_bottom = 280.0
 theme_override_colors/font_color = Color(1, 0.72, 0.35, 1)
 theme_override_font_sizes/font_size = 14
 
+[node name="InspectButton" type="Button" parent="HUD"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -138.0
+offset_top = 16.0
+offset_right = -18.0
+offset_bottom = 62.0
+grow_horizontal = 0
+text = "Inspect"
+
+[node name="InspectPanel" type="PanelContainer" parent="HUD"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -390.0
+offset_top = 76.0
+offset_right = -18.0
+offset_bottom = 240.0
+grow_horizontal = 0
+
+[node name="Margin" type="MarginContainer" parent="HUD/InspectPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="HUD/InspectPanel/Margin"]
+layout_mode = 2
+
+[node name="Details" type="Label" parent="HUD/InspectPanel/Margin/VBox"]
+layout_mode = 2
+text = "Tap a 3D part to inspect its JSON source."
+autowrap_mode = 2
+
+[node name="Copy" type="Button" parent="HUD/InspectPanel/Margin/VBox"]
+layout_mode = 2
+text = "Copy request"
+
 [node name="MobileControls" type="Control" parent="HUD"]
 layout_mode = 3
 anchors_preset = 15

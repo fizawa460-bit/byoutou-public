@@ -10,12 +10,20 @@ var _move_position := Vector2.ZERO
 var _look_last := Vector2.ZERO
 var _look_delta := Vector2.ZERO
 var _touch_enabled := false
+var inspection_mode := false
 
 func _ready() -> void:
     _touch_enabled = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
     visible = _touch_enabled
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     set_process_input(_touch_enabled)
+    queue_redraw()
+
+func set_inspection_mode(enabled: bool) -> void:
+    inspection_mode = enabled
+    _move_touch = -1
+    _look_touch = -1
+    _look_delta = Vector2.ZERO
     queue_redraw()
 
 func get_move_vector() -> Vector2:
@@ -29,7 +37,7 @@ func consume_look_delta() -> Vector2:
     return value
 
 func _input(event: InputEvent) -> void:
-    if not _touch_enabled:
+    if not _touch_enabled or inspection_mode:
         return
     if event is InputEventScreenTouch:
         if event.pressed:
@@ -55,7 +63,7 @@ func _input(event: InputEvent) -> void:
             _look_last = event.position
 
 func _draw() -> void:
-    if not _touch_enabled:
+    if not _touch_enabled or inspection_mode:
         return
     var hint_center := Vector2(min(115.0, size.x * 0.22), size.y - 115.0)
     var base := _move_origin if _move_touch >= 0 else hint_center
