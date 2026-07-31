@@ -55,12 +55,15 @@ jobs:
           mkdir -p poc/godot-map-3d/build/web
           godot --headless --path poc/godot-map-3d --export-release Web build/web/index.html
 
-      - name: Install Chromium
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - name: Install browser test dependencies
+        working-directory: poc/godot-map-3d
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
 
       - name: Smoke-test exported Web build
         working-directory: poc/godot-map-3d
-        run: npx --yes -p playwright@1.55.0 node web_smoke_test.mjs
+        run: node web_smoke_test.mjs
 
       - name: Upload Web smoke-test screenshot
         if: always()
