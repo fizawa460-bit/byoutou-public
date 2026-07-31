@@ -36,6 +36,7 @@ func _on_build_finished(map_name: String, warnings: PackedStringArray, generated
         info_label.text = "Map: %s  |  Objects: %d" % [map_name, generated_count]
         info_label.text += "\nLeft stick: move  |  Swipe right side: look"
     warnings_label.text = "\n".join(warnings)
+    print("MAP_BUILD_SUCCESS objects=%d map=%s" % [generated_count, map_name])
 
 func _on_build_timeout() -> void:
     if not _build_reported:

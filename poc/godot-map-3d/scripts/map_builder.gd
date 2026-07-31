@@ -179,7 +179,7 @@ func _add_environment_lights(width: int, height: int) -> void:
     artificial.position = Vector3(width * 0.5 * cell_meters, 2.35, height * 0.58 * cell_meters)
     artificial.light_color = Color("fff1d2")
     artificial.light_energy = 7.0
-    artificial.omni_range = max(width, height) * 0.62 * cell_meters
+    artificial.omni_range = maxf(float(width), float(height)) * 0.62 * cell_meters
     artificial.shadow_enabled = true
     add_child(artificial)
     var sun := DirectionalLight3D.new()
@@ -191,7 +191,7 @@ func _add_environment_lights(width: int, height: int) -> void:
     warnings.append("Sunlight uses PoC defaults because time/intensity are not stored in JSON.")
 
 func _sun_yaw(hour: float) -> float:
-    return lerp(-55.0, 55.0, clamp((hour - 7.0) / 10.0, 0.0, 1.0))
+    return lerpf(-55.0, 55.0, clampf((hour - 7.0) / 10.0, 0.0, 1.0))
 
 func _make_materials() -> void:
     materials.floor = _material(Color("77736b"), 0.92)
