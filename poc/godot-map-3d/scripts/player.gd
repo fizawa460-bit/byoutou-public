@@ -8,7 +8,7 @@ var inspection_mode := false
 @onready var mobile_controls = get_node_or_null("../HUD/MobileControls")
 
 func _ready() -> void:
-    if not DisplayServer.is_touchscreen_available() and not OS.has_feature("mobile"):
+    if not DisplayServer.is_touchscreen_available() and not OS.has_feature("mobile") and not OS.has_feature("web"):
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func set_inspection_mode(enabled: bool) -> void:

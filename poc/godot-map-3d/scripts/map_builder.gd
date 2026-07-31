@@ -158,8 +158,13 @@ func _peek_window_placeholder(x: float, y: float, w: float, h: float, rotation: 
 
 func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var span := _span(w, h)
-    var count: int = maxi(2, int(span / 0.28))
     var center := _center(x, y, w, h, wall_height * 0.5)
+    # In this map, a one-cell "bars" placement is the glazed end panel beside
+    # the iron bars. It is glass only, not glass layered over another iron grid.
+    if w <= 1.0 and h <= 1.0:
+        _box("BarsEndGlass", center, Vector3(span * 0.88, wall_height * 0.92, 0.025), materials.glass, false, deg_to_rad(rotation))
+        return
+    var count: int = maxi(2, int(span / 0.28))
     for i in range(count + 1):
         var offset: float = -span * 0.5 + span * float(i) / float(count)
         var pos := center + _rotated_offset(rotation, Vector3(offset, 0, 0))
@@ -167,9 +172,6 @@ func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     for level in [0.45, 1.35, 2.25]:
         var pos := Vector3(center.x, level, center.z)
         _box("BarCross", pos, Vector3(span, 0.045, 0.07), materials.metal, true, deg_to_rad(rotation))
-    # A one-cell bars placement represents the glazed end panel in this map.
-    if w <= 1.0 and h <= 1.0:
-        _box("BarsEndGlass", center, Vector3(span * 0.88, wall_height * 0.92, 0.025), materials.glass, false, deg_to_rad(rotation))
 
 func _curtain(x: float, y: float, w: float, h: float, rotation: float) -> void:
     _box("Curtain", _center(x, y, w, h, 1.6), Vector3(_span(w, h), 1.55, 0.025), materials.curtain, false, deg_to_rad(rotation))
@@ -215,7 +217,12 @@ func _rail(x: float, y: float, w: float, h: float, rotation: float, edge_aligned
     # requested cell edge instead of being placed through the cell centre.
     var center := _center(x, y, w, h, 0.012)
     if edge_aligned:
-        center += _rotated_offset(rotation, Vector3(0, 0, -minf(w, h) * cell_meters * 0.46))
+        # JSON rotation describes the visible/front edge in 2D screen
+        # coordinates. Convert that direction explicitly instead of using
+        # Godot's opposite-sign 3D yaw convention for the edge offset.
+        var angle := deg_to_rad(rotation)
+        var edge_direction := Vector3(sin(angle), 0, -cos(angle))
+        center += edge_direction * minf(w, h) * cell_meters * 0.46
     _box("FloorRailEdge" if edge_aligned else "FloorRail", center, Vector3(_span(w, h), 0.024, 0.055), materials.rail_white, false, deg_to_rad(rotation))
 
 func _meal_hatch(x: float, y: float, rotation: float) -> void:
