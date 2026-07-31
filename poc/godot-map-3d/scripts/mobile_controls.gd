@@ -14,7 +14,7 @@ var inspection_mode := false
 var _move_input_reported := false
 
 func _ready() -> void:
-    _touch_enabled = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
+    _touch_enabled = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile") or OS.has_feature("web")
     visible = _touch_enabled
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     set_process_input(_touch_enabled)
