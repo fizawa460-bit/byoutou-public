@@ -65,7 +65,9 @@ func _build_placement(p: Dictionary) -> void:
         "bars": _bars(x, y, size.x, size.y, rotation)
         "curtain": _curtain(x, y, size.x, size.y, rotation)
         "futon": _futon(x, y, size.x, size.y)
-        "table", "partition", "cabinet", "toilet", "sink": _furniture(tile, x, y, size.x, size.y, rotation)
+        "table", "partition", "cabinet": _furniture(tile, x, y, size.x, size.y, rotation)
+        "toilet": _toilet(x, y, size.x, size.y, rotation)
+        "sink": _sink(x, y, size.x, size.y, rotation)
         "rail", "railEdge": _rail(x, y, size.x, size.y, rotation)
         "mealHatchClosed", "mealHatchOpen": _meal_hatch(x, y, rotation)
         "grime", "shadow", "mealTray": pass
@@ -107,57 +109,73 @@ func _box(name: String, position: Vector3, size: Vector3, material: Material, co
     return body
 
 func _floor(x: float, y: float, w: float, h: float, dark: bool) -> void:
-    _box("Floor", _center(x, y, w, h, -0.06), Vector3(w * cell_meters, 0.12, h * cell_meters), materials.dark_floor if dark else materials.floor, true)
+    # Keep a narrow seam so JSON placement boundaries remain visible in 3D.
+    var seam := 0.025
+    var size := Vector3(maxf(0.05, w * cell_meters - seam), 0.12, maxf(0.05, h * cell_meters - seam))
+    _box("Floor", _center(x, y, w, h, -0.06), size, materials.dark_floor if dark else materials.floor, true)
 
 func _wall(tile: String, x: float, y: float, w: float, h: float, rotation: float) -> void:
     var size := Vector3(w * cell_meters, wall_height, 0.16)
     if tile == "wallSide": size = Vector3(0.16, wall_height, h * cell_meters)
     _box("Wall", _center(x, y, w, h, wall_height * 0.5), size, materials.wall, true, deg_to_rad(rotation))
 
+func _span(w: float, h: float) -> float:
+    return maxf(w, h) * cell_meters
+
+func _rotated_offset(rotation: float, local_offset: Vector3) -> Vector3:
+    return local_offset.rotated(Vector3.UP, deg_to_rad(rotation))
+
 func _door(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    var size := Vector3(w * cell_meters * 0.92, 2.25, 0.12)
-    if int(rotation) % 180 == 90: size = Vector3(0.12, 2.25, h * cell_meters * 0.92)
-    _box("Door", _center(x, y, w, h, 1.125), size, materials.door, true)
+    _box("Door", _center(x, y, w, h, 1.125), Vector3(_span(w, h) * 0.92, 2.25, 0.12), materials.door, true, deg_to_rad(rotation))
 
 func _window(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    var horizontal := int(rotation) % 180 == 0
-    var span := w * cell_meters if horizontal else h * cell_meters
+    var span := _span(w, h)
     var pos := _center(x, y, w, h, 1.55)
-    _box("WindowGlass", pos, Vector3(span, 1.25, 0.04) if horizontal else Vector3(0.04, 1.25, span), materials.glass, false)
-    _box("WindowSill", pos + Vector3(0, -0.72, 0), Vector3(span, 0.12, 0.18) if horizontal else Vector3(0.18, 0.12, span), materials.metal, true)
+    _box("WindowGlass", pos, Vector3(span, 1.25, 0.04), materials.glass, false, deg_to_rad(rotation))
+    _box("WindowSill", pos + Vector3(0, -0.72, 0), Vector3(span, 0.12, 0.18), materials.metal, true, deg_to_rad(rotation))
 
 func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    var horizontal := int(rotation) % 180 == 0
-    var span := w * cell_meters if horizontal else h * cell_meters
+    var span := _span(w, h)
     var count: int = maxi(2, int(span / 0.28))
+    var center := _center(x, y, w, h, wall_height * 0.5)
     for i in range(count + 1):
         var offset: float = -span * 0.5 + span * float(i) / float(count)
-        var pos := _center(x, y, w, h, wall_height * 0.5)
-        pos += Vector3(offset, 0, 0) if horizontal else Vector3(0, 0, offset)
-        _box("Bar", pos, Vector3(0.045, wall_height, 0.06) if horizontal else Vector3(0.06, wall_height, 0.045), materials.metal, true)
+        var pos := center + _rotated_offset(rotation, Vector3(offset, 0, 0))
+        _box("Bar", pos, Vector3(0.045, wall_height, 0.06), materials.metal, true, deg_to_rad(rotation))
     for level in [0.45, 1.35, 2.25]:
-        var pos := _center(x, y, w, h, level)
-        _box("BarCross", pos, Vector3(span, 0.045, 0.07) if horizontal else Vector3(0.07, 0.045, span), materials.metal, true)
+        var pos := Vector3(center.x, level, center.z)
+        _box("BarCross", pos, Vector3(span, 0.045, 0.07), materials.metal, true, deg_to_rad(rotation))
 
 func _curtain(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    var horizontal := int(rotation) % 180 == 0
-    var pos := _center(x, y, w, h, 1.6)
-    _box("Curtain", pos, Vector3(w * cell_meters, 1.55, 0.025) if horizontal else Vector3(0.025, 1.55, h * cell_meters), materials.curtain, false)
+    _box("Curtain", _center(x, y, w, h, 1.6), Vector3(_span(w, h), 1.55, 0.025), materials.curtain, false, deg_to_rad(rotation))
 
 func _futon(x: float, y: float, w: float, h: float) -> void:
-    _box("Futon", _center(x, y, w, h, 0.09), Vector3(w * cell_meters * 0.82, 0.18, h * cell_meters * 0.86), materials.fabric, true)
+    # The futon is visual-only: the player may walk across it.
+    _box("Futon", _center(x, y, w, h, 0.09), Vector3(w * cell_meters * 0.82, 0.18, h * cell_meters * 0.86), materials.fabric, false)
 
 func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: float) -> void:
     var height := 0.78
     if tile == "partition": height = 1.45
     if tile == "cabinet": height = 1.1
     var size := Vector3(w * cell_meters * 0.72, height, h * cell_meters * 0.72)
-    _box(tile, _center(x, y, w, h, height * 0.5), size, materials.metal if tile in ["toilet", "sink"] else materials.furniture, true, deg_to_rad(rotation))
+    _box(tile, _center(x, y, w, h, height * 0.5), size, materials.furniture, true, deg_to_rad(rotation))
+
+func _toilet(x: float, y: float, w: float, h: float, rotation: float) -> void:
+    var center := _center(x, y, w, h)
+    _box("ToiletBase", center + Vector3(0, 0.20, 0), Vector3(0.46, 0.40, 0.62), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("ToiletSeat", center + _rotated_offset(rotation, Vector3(0, 0.43, -0.08)), Vector3(0.52, 0.10, 0.62), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("ToiletTank", center + _rotated_offset(rotation, Vector3(0, 0.62, 0.30)), Vector3(0.56, 0.72, 0.22), materials.fixture_white, true, deg_to_rad(rotation))
+
+func _sink(x: float, y: float, w: float, h: float, rotation: float) -> void:
+    var center := _center(x, y, w, h)
+    _box("SinkPedestal", center + Vector3(0, 0.36, 0), Vector3(0.24, 0.72, 0.24), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("SinkBasin", center + _rotated_offset(rotation, Vector3(0, 0.78, -0.06)), Vector3(0.72, 0.16, 0.54), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("SinkBack", center + _rotated_offset(rotation, Vector3(0, 0.93, 0.22)), Vector3(0.72, 0.32, 0.08), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("SinkFaucet", center + _rotated_offset(rotation, Vector3(0, 1.06, 0.08)), Vector3(0.08, 0.22, 0.08), materials.metal, false, deg_to_rad(rotation))
 
 func _rail(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    var horizontal := int(rotation) % 180 == 0
-    var span: float = maxf(w, h) * cell_meters
-    _box("Rail", _center(x, y, w, h, 1.0), Vector3(span, 0.06, 0.06) if horizontal else Vector3(0.06, 0.06, span), materials.metal, false, deg_to_rad(rotation if int(rotation) % 45 == 0 else 0))
+    # Rails are authored along local X, then rotated exactly once.
+    _box("FloorRail", _center(x, y, w, h, 0.035), Vector3(_span(w, h), 0.07, 0.07), materials.rail_white, false, deg_to_rad(rotation))
 
 func _meal_hatch(x: float, y: float, rotation: float) -> void:
     _box("MealHatch", _center(x, y, 1, 1, 1.05), Vector3(0.58, 0.34, 0.08), materials.metal, false, deg_to_rad(rotation))
@@ -200,6 +218,8 @@ func _make_materials() -> void:
     materials.ceiling = _material(Color("aaa9a3"), 0.95)
     materials.door = _material(Color("6d7778"), 0.7)
     materials.metal = _material(Color("697276"), 0.42, 0.65)
+    materials.rail_white = _material(Color("e8e9e4"), 0.48, 0.15)
+    materials.fixture_white = _material(Color("d9ddd9"), 0.62)
     materials.fabric = _material(Color("a59c83"), 1.0)
     materials.furniture = _material(Color("4c4134"), 0.78)
     materials.curtain = _material(Color(0.84, 0.85, 0.80, 0.82), 0.95, 0.0, true)
