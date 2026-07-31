@@ -1,0 +1,50 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource path="res://scripts/main.gd" type="Script" id="1"]
+[ext_resource path="res://scripts/map_builder.gd" type="Script" id="2"]
+[ext_resource path="res://scripts/player.gd" type="Script" id="3"]
+
+[sub_resource type="CapsuleShape3D" id="Capsule"]
+radius = 0.32
+height = 1.7
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+
+[node name="World" type="Node3D" parent="."]
+script = ExtResource("2")
+map_json_path = "res://maps/hard_room_v1.json"
+
+[node name="Player" type="CharacterBody3D" parent="."]
+position = Vector3(6.0, 0.2, 11.8)
+script = ExtResource("3")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+position = Vector3(0, 0.85, 0)
+shape = SubResource("Capsule")
+
+[node name="Head" type="Node3D" parent="Player"]
+position = Vector3(0, 1.55, 0)
+
+[node name="Camera3D" type="Camera3D" parent="Player/Head"]
+current = true
+near = 0.05
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Info" type="Label" parent="HUD"]
+offset_left = 18.0
+offset_top = 16.0
+offset_right = 620.0
+offset_bottom = 90.0
+text = "WASD / 矢印: 移動  マウス: 視点  Esc: マウス解放\nJSON → 3D PoC"
+theme_override_colors/font_color = Color(0.92, 0.92, 0.88, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="Warnings" type="Label" parent="HUD"]
+offset_left = 18.0
+offset_top = 92.0
+offset_right = 850.0
+offset_bottom = 280.0
+theme_override_colors/font_color = Color(1, 0.72, 0.35, 1)
+theme_override_font_sizes/font_size = 14
