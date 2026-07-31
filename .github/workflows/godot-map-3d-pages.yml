@@ -28,23 +28,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Godot
+      - name: Install Godot and export templates
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.3.0
           use-dotnet: false
           include-templates: true
 
-      - name: Validate scripts and start scene
+      - name: Run scene and require map generation
         shell: bash
         run: |
           set -o pipefail
           log_file="$(mktemp)"
-          godot --headless --path poc/godot-map-3d --editor --quit-after 3 2>&1 | tee "$log_file"
+          timeout 15s godot --headless --path poc/godot-map-3d 2>&1 | tee "$log_file" || status=$?
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot get class" "$log_file"; then
             echo "Godot reported a script loading error."
             exit 1
           fi
+          if ! grep -q "MAP_BUILD_SUCCESS" "$log_file"; then
+            echo "The running scene did not finish JSON to 3D generation."
+            exit 1
+          fi
+
+      - name: Export Web build
+        run: |
+          mkdir -p poc/godot-map-3d/build/web
+          godot --headless --path poc/godot-map-3d --export-release Web build/web/index.html
+
+      - name: Install Chromium
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Smoke-test exported Web build
+        working-directory: poc/godot-map-3d
+        run: npx --yes -p playwright@1.55.0 node web_smoke_test.mjs
+
+      - name: Upload Web smoke-test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-web-smoke
+          path: poc/godot-map-3d/build/web-smoke.png
+          if-no-files-found: ignore
 
   build:
     if: github.event_name != 'pull_request'
