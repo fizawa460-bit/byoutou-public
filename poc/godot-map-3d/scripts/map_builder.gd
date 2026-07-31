@@ -11,6 +11,7 @@ signal build_progress(stage: String)
 var warnings := PackedStringArray()
 var materials: Dictionary = {}
 var generated_count := 0
+var _current_placement: Dictionary = {}
 
 func start_build() -> void:
     build_progress.emit("Preparing materials...")
@@ -57,18 +58,22 @@ func _build_placement(p: Dictionary) -> void:
     var y := float(p.get("y", 0))
     var size := _placement_size(p, tile)
     var rotation := float(p.get("rotation", 0))
+    _current_placement = p.duplicate(true)
     match tile:
         "floor", "floorDark": _floor(x, y, size.x, size.y, tile == "floorDark")
         "wallTop", "wallSide": _wall(tile, x, y, size.x, size.y, rotation)
         "door", "doorSmall": _door(x, y, size.x, size.y, rotation)
-        "window", "peekWindow": _window(x, y, size.x, size.y, rotation)
+        "window": _window(x, y, size.x, size.y, rotation)
+        "peekWindow": _peek_window_placeholder(x, y, size.x, size.y, rotation)
         "bars": _bars(x, y, size.x, size.y, rotation)
         "curtain": _curtain(x, y, size.x, size.y, rotation)
         "futon": _futon(x, y, size.x, size.y)
-        "table", "partition", "cabinet": _furniture(tile, x, y, size.x, size.y, rotation)
+        "table": _table(x, y, size.x, size.y, rotation)
+        "partition", "cabinet": _furniture(tile, x, y, size.x, size.y, rotation)
         "toilet": _toilet(x, y, size.x, size.y, rotation)
         "sink": _sink(x, y, size.x, size.y, rotation)
-        "rail", "railEdge": _rail(x, y, size.x, size.y, rotation)
+        "rail": _rail(x, y, size.x, size.y, rotation, false)
+        "railEdge": _rail(x, y, size.x, size.y, rotation, true)
         "mealHatchClosed", "mealHatchOpen": _meal_hatch(x, y, rotation)
         "grime", "shadow", "mealTray": pass
         _:
@@ -93,18 +98,28 @@ func _box(name: String, position: Vector3, size: Vector3, material: Material, co
     body.name = name
     body.position = position
     body.rotation.y = rotation_y
+    body.collision_layer = 3 if collision else 2
+    body.collision_mask = 0
+    body.set_meta("tile", str(_current_placement.get("tile", name)))
+    body.set_meta("part", name)
+    body.set_meta("map_x", float(_current_placement.get("x", 0)))
+    body.set_meta("map_y", float(_current_placement.get("y", 0)))
+    body.set_meta("map_width", float(_current_placement.get("width", 1)))
+    body.set_meta("map_height", float(_current_placement.get("height", 1)))
+    body.set_meta("map_rotation", float(_current_placement.get("rotation", 0)))
     var mesh_instance := MeshInstance3D.new()
     var mesh := BoxMesh.new()
     mesh.size = size
     mesh.material = material
     mesh_instance.mesh = mesh
     body.add_child(mesh_instance)
-    if collision:
-        var shape_node := CollisionShape3D.new()
-        var shape := BoxShape3D.new()
-        shape.size = size
-        shape_node.shape = shape
-        body.add_child(shape_node)
+    # Every generated part is ray-pickable on layer 2 for inspection mode.
+    # Only parts marked collision=true also occupy player collision layer 1.
+    var shape_node := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = size
+    shape_node.shape = shape
+    body.add_child(shape_node)
     add_child(body)
     return body
 
@@ -134,6 +149,13 @@ func _window(x: float, y: float, w: float, h: float, rotation: float) -> void:
     _box("WindowGlass", pos, Vector3(span, 1.25, 0.04), materials.glass, false, deg_to_rad(rotation))
     _box("WindowSill", pos + Vector3(0, -0.72, 0), Vector3(span, 0.12, 0.18), materials.metal, true, deg_to_rad(rotation))
 
+func _peek_window_placeholder(x: float, y: float, w: float, h: float, rotation: float) -> void:
+    # The existing peekWindow artwork was being mistaken for a full-height glass panel.
+    # Keep only a small frame marker until the dedicated 3D hatch is authored.
+    var center := _center(x, y, w, h, 1.45)
+    _box("PeekWindowFrameTop", center + Vector3(0, 0.24, 0), Vector3(0.58, 0.05, 0.12), materials.metal, false, deg_to_rad(rotation))
+    _box("PeekWindowFrameBottom", center + Vector3(0, -0.24, 0), Vector3(0.58, 0.05, 0.12), materials.metal, false, deg_to_rad(rotation))
+
 func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var span := _span(w, h)
     var count: int = maxi(2, int(span / 0.28))
@@ -145,6 +167,9 @@ func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     for level in [0.45, 1.35, 2.25]:
         var pos := Vector3(center.x, level, center.z)
         _box("BarCross", pos, Vector3(span, 0.045, 0.07), materials.metal, true, deg_to_rad(rotation))
+    # A one-cell bars placement represents the glazed end panel in this map.
+    if w <= 1.0 and h <= 1.0:
+        _box("BarsEndGlass", center, Vector3(span * 0.88, wall_height * 0.92, 0.025), materials.glass, false, deg_to_rad(rotation))
 
 func _curtain(x: float, y: float, w: float, h: float, rotation: float) -> void:
     _box("Curtain", _center(x, y, w, h, 1.6), Vector3(_span(w, h), 1.55, 0.025), materials.curtain, false, deg_to_rad(rotation))
@@ -152,6 +177,16 @@ func _curtain(x: float, y: float, w: float, h: float, rotation: float) -> void:
 func _futon(x: float, y: float, w: float, h: float) -> void:
     # The futon is visual-only: the player may walk across it.
     _box("Futon", _center(x, y, w, h, 0.09), Vector3(w * cell_meters * 0.82, 0.18, h * cell_meters * 0.86), materials.fabric, false)
+
+func _table(x: float, y: float, w: float, h: float, rotation: float) -> void:
+    # Build along local X and rotate once; width/height are the occupied JSON bounds.
+    var span := _span(w, h) * 0.86
+    var depth := minf(w, h) * cell_meters * 0.72
+    var center := _center(x, y, w, h)
+    _box("MealTableTop", center + Vector3(0, 0.73, 0), Vector3(span, 0.10, depth), materials.furniture, true, deg_to_rad(rotation))
+    for local_x in [-span * 0.38, span * 0.38]:
+        var leg_pos := center + _rotated_offset(rotation, Vector3(local_x, 0.36, 0))
+        _box("MealTableLeg", leg_pos, Vector3(0.10, 0.72, depth * 0.72), materials.furniture, true, deg_to_rad(rotation))
 
 func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: float) -> void:
     var height := 0.78
@@ -173,12 +208,19 @@ func _sink(x: float, y: float, w: float, h: float, rotation: float) -> void:
     _box("SinkBack", center + _rotated_offset(rotation, Vector3(0, 0.93, 0.22)), Vector3(0.72, 0.32, 0.08), materials.fixture_white, true, deg_to_rad(rotation))
     _box("SinkFaucet", center + _rotated_offset(rotation, Vector3(0, 1.06, 0.08)), Vector3(0.08, 0.22, 0.08), materials.metal, false, deg_to_rad(rotation))
 
-func _rail(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    # Rails are authored along local X, then rotated exactly once.
-    _box("FloorRail", _center(x, y, w, h, 0.035), Vector3(_span(w, h), 0.07, 0.07), materials.rail_white, false, deg_to_rad(rotation))
+func _rail(x: float, y: float, w: float, h: float, rotation: float, edge_aligned: bool) -> void:
+    # Rails are authored along local X and rotated once. railEdge is shifted to the
+    # requested cell edge instead of being placed through the cell centre.
+    var center := _center(x, y, w, h, 0.012)
+    if edge_aligned:
+        center += _rotated_offset(rotation, Vector3(0, 0, -minf(w, h) * cell_meters * 0.46))
+    _box("FloorRailEdge" if edge_aligned else "FloorRail", center, Vector3(_span(w, h), 0.024, 0.055), materials.rail_white, false, deg_to_rad(rotation))
 
 func _meal_hatch(x: float, y: float, rotation: float) -> void:
-    _box("MealHatch", _center(x, y, 1, 1, 1.05), Vector3(0.58, 0.34, 0.08), materials.metal, false, deg_to_rad(rotation))
+    # Offset toward the room so the wall no longer hides the serving hatch.
+    var center := _center(x, y, 1, 1, 1.08) + _rotated_offset(rotation, Vector3(0, 0, -0.11))
+    _box("MealHatchFrame", center, Vector3(0.68, 0.44, 0.07), materials.metal, false, deg_to_rad(rotation))
+    _box("MealHatchDoor", center + _rotated_offset(rotation, Vector3(0, 0, -0.025)), Vector3(0.58, 0.34, 0.035), materials.door, false, deg_to_rad(rotation))
 
 func _add_ceiling(width: int, height: int) -> void:
     _box("Ceiling", Vector3(width * cell_meters * 0.5, wall_height, height * cell_meters * 0.5), Vector3(width * cell_meters, 0.08, height * cell_meters), materials.ceiling, false)
