@@ -179,14 +179,16 @@ func _futon(x: float, y: float, w: float, h: float) -> void:
     _box("Futon", _center(x, y, w, h, 0.09), Vector3(w * cell_meters * 0.82, 0.18, h * cell_meters * 0.86), materials.fabric, false)
 
 func _table(x: float, y: float, w: float, h: float, rotation: float) -> void:
-    # Build along local X and rotate once; width/height are the occupied JSON bounds.
-    var span := _span(w, h) * 0.86
-    var depth := minf(w, h) * cell_meters * 0.72
+    # The editor already stores the rotated occupied bounds in width/height.
+    # Applying rotation again turns a horizontal 3x1 table back into a vertical one.
+    var table_width := w * cell_meters * 0.86
+    var table_depth := h * cell_meters * 0.72
     var center := _center(x, y, w, h)
-    _box("MealTableTop", center + Vector3(0, 0.73, 0), Vector3(span, 0.10, depth), materials.furniture, true, deg_to_rad(rotation))
-    for local_x in [-span * 0.38, span * 0.38]:
-        var leg_pos := center + _rotated_offset(rotation, Vector3(local_x, 0.36, 0))
-        _box("MealTableLeg", leg_pos, Vector3(0.10, 0.72, depth * 0.72), materials.furniture, true, deg_to_rad(rotation))
+    _box("MealTableTop", center + Vector3(0, 0.73, 0), Vector3(table_width, 0.10, table_depth), materials.furniture, true)
+    for local_x in [-table_width * 0.38, table_width * 0.38]:
+        var leg_pos := center + Vector3(local_x, 0.36, 0)
+        _box("MealTableLeg", leg_pos, Vector3(0.10, 0.72, table_depth * 0.72), materials.furniture, true)
+    print("TABLE_BUILD_ORIENTATION width=%.2f depth=%.2f json_rotation=%.1f" % [table_width, table_depth, rotation])
 
 func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: float) -> void:
     var height := 0.78
