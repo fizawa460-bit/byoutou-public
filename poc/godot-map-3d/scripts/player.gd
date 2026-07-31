@@ -3,6 +3,7 @@ extends CharacterBody3D
 @export var speed := 3.2
 @export var mouse_sensitivity := 0.0022
 @export var gravity := 18.0
+var inspection_mode := false
 @onready var head: Node3D = $Head
 @onready var mobile_controls = get_node_or_null("../HUD/MobileControls")
 
@@ -10,7 +11,14 @@ func _ready() -> void:
     if not DisplayServer.is_touchscreen_available() and not OS.has_feature("mobile"):
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+func set_inspection_mode(enabled: bool) -> void:
+    inspection_mode = enabled
+    if enabled:
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
 func _unhandled_input(event: InputEvent) -> void:
+    if inspection_mode:
+        return
     if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         _apply_look(event.relative, mouse_sensitivity)
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
@@ -19,6 +27,9 @@ func _unhandled_input(event: InputEvent) -> void:
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _physics_process(delta: float) -> void:
+    if inspection_mode:
+        velocity = Vector3.ZERO
+        return
     var keyboard_input := Vector2(
         float(Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)) - float(Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),
         float(Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN)) - float(Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP))
