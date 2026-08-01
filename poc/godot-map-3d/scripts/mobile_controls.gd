@@ -20,13 +20,20 @@ func _ready() -> void:
     set_process_input(_touch_enabled)
     queue_redraw()
 
-func set_inspection_mode(enabled: bool) -> void:
-    inspection_mode = enabled
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+        _reset_touches()
+
+func _reset_touches() -> void:
     _move_touch = -1
     _look_touch = -1
     _move_position = _move_origin
     _look_delta = Vector2.ZERO
     queue_redraw()
+
+func set_inspection_mode(enabled: bool) -> void:
+    inspection_mode = enabled
+    _reset_touches()
 
 func get_move_vector() -> Vector2:
     if _move_touch < 0:
@@ -44,11 +51,14 @@ func _input(event: InputEvent) -> void:
     var viewport_size := get_viewport_rect().size
     if event is InputEventScreenTouch:
         if event.pressed:
-            if event.position.x < viewport_size.x * 0.5 and _move_touch < 0:
+            if event.position.x < viewport_size.x * 0.5:
+                # Mobile browsers can drop touch-end/cancel while the canvas changes
+                # focus. A fresh left-side press is authoritative and reclaims the
+                # movement slot instead of leaving a stale touch ID locked forever.
                 _move_touch = event.index
                 _move_origin = event.position
                 _move_position = event.position
-            elif _look_touch < 0:
+            elif _look_touch < 0 or _look_touch == event.index:
                 _look_touch = event.index
                 _look_last = event.position
         else:
