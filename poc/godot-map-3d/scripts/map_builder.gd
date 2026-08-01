@@ -162,7 +162,13 @@ func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     # In this map, a one-cell "bars" placement is the glazed end panel beside
     # the iron bars. It is glass only, not glass layered over another iron grid.
     if w <= 1.0 and h <= 1.0:
-        _box("BarsEndGlass", center, Vector3(span * 0.88, wall_height * 0.92, 0.025), materials.glass, false, deg_to_rad(rotation))
+        # The glazed end panel is a solid boundary. Its bottom 20 cm is an
+        # ordinary wall, with collision glass filling the space above it.
+        var base_height := 0.20
+        var glass_height := wall_height - base_height
+        var panel_width := span * 0.88
+        _box("BarsEndWallBase", _center(x, y, w, h, base_height * 0.5), Vector3(panel_width, base_height, 0.16), materials.wall, true, deg_to_rad(rotation))
+        _box("BarsEndGlass", _center(x, y, w, h, base_height + glass_height * 0.5), Vector3(panel_width, glass_height, 0.04), materials.glass, true, deg_to_rad(rotation))
         return
     var count: int = maxi(2, int(span / 0.28))
     for i in range(count + 1):
