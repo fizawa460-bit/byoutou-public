@@ -239,23 +239,25 @@
       "layer": "overlay"
     },
     {
-      "tile": "toilet",
+      "tile": "toiletSinkCombo",
       "x": 10,
-      "y": 12,
+      "y": 11,
       "layer": "fixture",
-      "rotation": 90
+      "rotation": 90,
+      "width": 1,
+      "height": 2,
+      "fixture_style": "security_toilet_sink_combo",
+      "material": "stainless_steel"
     },
     {
       "tile": "toiletPaperDispenser",
-      "x": 11,
-      "y": 12,
+      "x": 10,
+      "y": 13,
       "layer": "fixture",
-      "rotation": 270,
+      "rotation": 0,
       "mount": "recessed_wall",
-      "patient_side": "paper_slot_only",
-      "refill_side": "staff_only",
-      "material": "stainless_steel",
-      "locked": true
+      "side": "toilet_lateral",
+      "refill": "staff_side"
     },
     {
       "tile": "window",
@@ -280,13 +282,6 @@
       "layer": "fixture",
       "width": 1,
       "height": 1
-    },
-    {
-      "tile": "sink",
-      "x": 10,
-      "y": 11,
-      "layer": "fixture",
-      "rotation": 90
     },
     {
       "tile": "wallTop",
