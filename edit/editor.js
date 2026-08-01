@@ -82,6 +82,22 @@
     },
     toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
     sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
+    toiletPaperDispenser: {
+      name: "壁埋込トイレットペーパー",
+      layer: "fixture",
+      w: 1,
+      h: 1,
+      draw: drawToiletPaperDispenser,
+      rotations: [0, 90, 180, 270],
+      castsShadow: false,
+      placementDefaults: {
+        mount: "recessed_wall",
+        patient_side: "paper_slot_only",
+        refill_side: "staff_only",
+        material: "stainless_steel",
+        locked: true
+      }
+    },
     mealTray: { name: "食事トレー", layer: "overlay", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
     partition: { name: "低い仕切り", layer: "fixture", w: 1, h: 2, draw: drawPartition },
     cabinet: { name: "小設備", layer: "fixture", w: 1, h: 1, draw: drawCabinet },
@@ -139,6 +155,7 @@
       {"tile":"shadow","x":11,"y":11,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":12,"layer":"overlay"},
       {"tile":"toilet","x":10,"y":12,"layer":"fixture","rotation":90},
+      {"tile":"toiletPaperDispenser","x":11,"y":12,"layer":"fixture","rotation":270,"mount":"recessed_wall","patient_side":"paper_slot_only","refill_side":"staff_only","material":"stainless_steel","locked":true},
       {"tile":"window","x":1,"y":0,"layer":"structure","width":10,"height":1},
       {"tile":"curtain","x":10,"y":0,"layer":"fixture","width":1,"height":1},
       {"tile":"curtain","x":1,"y":0,"layer":"fixture","width":1,"height":1},
@@ -480,7 +497,15 @@
     const normal = defaultFootprint(tileId, selectedRotation);
     const customSize = selectedWidth !== normal.w || selectedHeight !== normal.h;
     const canRotate = Array.isArray(tile.rotations);
-    const next = { tile: tileId, x, y, layer: tile.layer, ...(canRotate ? { rotation: selectedRotation } : {}), ...(customSize ? { width: selectedWidth, height: selectedHeight } : {}) };
+    const next = {
+      tile: tileId,
+      x,
+      y,
+      layer: tile.layer,
+      ...(canRotate ? { rotation: selectedRotation } : {}),
+      ...(customSize ? { width: selectedWidth, height: selectedHeight } : {}),
+      ...(tile.placementDefaults ? clone(tile.placementDefaults) : {})
+    };
     const size = footprint(next);
     if (x + size.w > map.width || y + size.h > map.height) return setStatus("マップの外には配置できません");
     map.placements = map.placements.filter((p) => p.layer !== tile.layer || !overlaps(p, next));
@@ -2077,6 +2102,25 @@
     g.fillStyle = "#858a89";
     g.fillRect(x + w * .22, y + h * .2, w * .1, h * .08);
     g.fillRect(x + w * .68, y + h * .2, w * .1, h * .08);
+    g.restore();
+  }
+  function drawToiletPaperDispenser(g, x, y, w, h) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.5)";
+    g.shadowBlur = Math.max(4, w * .06);
+    g.shadowOffsetY = Math.max(2, h * .035);
+    const steel = g.createLinearGradient(x, y, x + w, y + h);
+    steel.addColorStop(0, "#d5d7d5");
+    steel.addColorStop(.28, "#777d7d");
+    steel.addColorStop(.58, "#b7bab7");
+    steel.addColorStop(1, "#555b5b");
+    rect(g, x + w * .18, y + h * .22, w * .64, h * .56, steel, "#343838", Math.max(2, w * .035));
+    g.shadowColor = "transparent";
+    rect(g, x + w * .29, y + h * .5, w * .42, h * .09, "#141717", "#d7d8d4", Math.max(1, w * .02));
+    g.fillStyle = "#dedbd0";
+    g.fillRect(x + w * .34, y + h * .59, w * .32, h * .13);
+    g.fillStyle = "rgba(255,255,255,.38)";
+    g.fillRect(x + w * .23, y + h * .27, w * .48, Math.max(2, h * .035));
     g.restore();
   }
   function drawPartition(g, x, y, w, h) { g.save(); g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 8; g.shadowOffsetX = 5; const grad = g.createLinearGradient(x, y, x + w, y); grad.addColorStop(0, "#4b4a46"); grad.addColorStop(.5, "#89857b"); grad.addColorStop(1, "#4a4946"); rect(g, x + 20, y + 3, w - 40, h - 6, grad, "#2b2b29", 2); g.restore(); }
