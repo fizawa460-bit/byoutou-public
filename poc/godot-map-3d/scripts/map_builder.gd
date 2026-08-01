@@ -192,6 +192,11 @@ func _table(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var table_width := w * cell_meters * 0.86
     var table_depth := h * cell_meters * 0.72
     var center := _center(x, y, w, h)
+    # A 90-degree table in this map sits against the wall on the positive Z
+    # side. The wall mesh is centred in the next cell, so move the table beyond
+    # its occupied-cell centre while leaving a small visible clearance.
+    if is_equal_approx(fposmod(rotation, 360.0), 90.0):
+        center.z += 0.48 * cell_meters
     _box("MealTableTop", center + Vector3(0, 0.73, 0), Vector3(table_width, 0.10, table_depth), materials.furniture, true)
     for local_x in [-table_width * 0.38, table_width * 0.38]:
         var leg_pos := center + Vector3(local_x, 0.36, 0)
