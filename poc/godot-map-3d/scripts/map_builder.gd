@@ -72,6 +72,7 @@ func _build_placement(p: Dictionary) -> void:
         "partition", "cabinet": _furniture(tile, x, y, size.x, size.y, rotation)
         "toilet": _toilet(x, y, size.x, size.y, rotation)
         "sink": _sink(x, y, size.x, size.y, rotation)
+        "toiletPaperDispenser": _toilet_paper_dispenser(x, y, rotation)
         "rail": _rail(x, y, size.x, size.y, rotation, false)
         "railEdge": _rail(x, y, size.x, size.y, rotation, true)
         "mealHatchClosed", "mealHatchOpen": _meal_hatch(x, y, rotation)
@@ -218,16 +219,26 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
 
 func _toilet(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
-    _box("ToiletBase", center + Vector3(0, 0.20, 0), Vector3(0.46, 0.40, 0.62), materials.fixture_white, true, deg_to_rad(rotation))
-    _box("ToiletSeat", center + _rotated_offset(rotation, Vector3(0, 0.43, -0.08)), Vector3(0.52, 0.10, 0.62), materials.fixture_white, true, deg_to_rad(rotation))
-    _box("ToiletTank", center + _rotated_offset(rotation, Vector3(0, 0.62, 0.30)), Vector3(0.56, 0.72, 0.22), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("StainlessToiletBase", center + Vector3(0, 0.20, 0), Vector3(0.46, 0.40, 0.62), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("StainlessToiletRim", center + _rotated_offset(rotation, Vector3(0, 0.43, -0.08)), Vector3(0.52, 0.10, 0.62), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("StainlessToiletBack", center + _rotated_offset(rotation, Vector3(0, 0.62, 0.30)), Vector3(0.56, 0.72, 0.22), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("ToiletBowlOpening", center + _rotated_offset(rotation, Vector3(0, 0.49, -0.12)), Vector3(0.31, 0.015, 0.38), materials.fixture_dark, false, deg_to_rad(rotation))
 
 func _sink(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
-    _box("SinkPedestal", center + Vector3(0, 0.36, 0), Vector3(0.24, 0.72, 0.24), materials.fixture_white, true, deg_to_rad(rotation))
-    _box("SinkBasin", center + _rotated_offset(rotation, Vector3(0, 0.78, -0.06)), Vector3(0.72, 0.16, 0.54), materials.fixture_white, true, deg_to_rad(rotation))
-    _box("SinkBack", center + _rotated_offset(rotation, Vector3(0, 0.93, 0.22)), Vector3(0.72, 0.32, 0.08), materials.fixture_white, true, deg_to_rad(rotation))
+    _box("StainlessSinkPedestal", center + Vector3(0, 0.36, 0), Vector3(0.24, 0.72, 0.24), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("StainlessSinkBasin", center + _rotated_offset(rotation, Vector3(0, 0.78, -0.06)), Vector3(0.72, 0.16, 0.54), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("StainlessSinkBack", center + _rotated_offset(rotation, Vector3(0, 0.93, 0.22)), Vector3(0.72, 0.32, 0.08), materials.fixture_metal, true, deg_to_rad(rotation))
+    _box("SinkBasinOpening", center + _rotated_offset(rotation, Vector3(0, 0.875, -0.08)), Vector3(0.48, 0.012, 0.30), materials.fixture_dark, false, deg_to_rad(rotation))
     _box("SinkFaucet", center + _rotated_offset(rotation, Vector3(0, 1.06, 0.08)), Vector3(0.08, 0.22, 0.08), materials.metal, false, deg_to_rad(rotation))
+
+func _toilet_paper_dispenser(x: float, y: float, rotation: float) -> void:
+    # JSON records the wall construction: only a narrow paper outlet is exposed
+    # to the patient; the locked roll compartment is serviced from staff side.
+    var center := _center(x, y, 1, 1, 0.76) + _rotated_offset(rotation, Vector3(0, 0, -0.43))
+    _box("DispenserPatientPlate", center, Vector3(0.54, 0.42, 0.045), materials.fixture_metal, false, deg_to_rad(rotation))
+    _box("DispenserPaperSlot", center + _rotated_offset(rotation, Vector3(0, -0.04, -0.028)), Vector3(0.34, 0.065, 0.018), materials.fixture_dark, false, deg_to_rad(rotation))
+    _box("DispenserPaperTail", center + _rotated_offset(rotation, Vector3(0, -0.15, -0.043)), Vector3(0.27, 0.18, 0.008), materials.paper, false, deg_to_rad(rotation))
 
 func _rail(x: float, y: float, w: float, h: float, rotation: float, edge_aligned: bool) -> void:
     # Rails are authored along local X and rotated once. railEdge is shifted to the
@@ -288,6 +299,9 @@ func _make_materials() -> void:
     materials.metal = _material(Color("697276"), 0.42, 0.65)
     materials.rail_white = _material(Color("e8e9e4"), 0.48, 0.15)
     materials.fixture_white = _material(Color("d9ddd9"), 0.62)
+    materials.fixture_metal = _material(Color("9da4a3"), 0.32, 0.82)
+    materials.fixture_dark = _material(Color("181c1d"), 0.7, 0.25)
+    materials.paper = _material(Color("ddd9cd"), 0.96)
     materials.fabric = _material(Color("a59c83"), 1.0)
     materials.furniture = _material(Color("4c4134"), 0.78)
     materials.curtain = _material(Color(0.84, 0.85, 0.80, 0.82), 0.95, 0.0, true)
