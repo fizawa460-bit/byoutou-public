@@ -162,7 +162,13 @@ func _bars(x: float, y: float, w: float, h: float, rotation: float) -> void:
     # In this map, a one-cell "bars" placement is the glazed end panel beside
     # the iron bars. It is glass only, not glass layered over another iron grid.
     if w <= 1.0 and h <= 1.0:
-        _box("BarsEndGlass", center, Vector3(span * 0.88, wall_height * 0.92, 0.025), materials.glass, false, deg_to_rad(rotation))
+        # The glazed end panel is a solid boundary. Its bottom 20 cm is an
+        # ordinary wall, with collision glass filling the space above it.
+        var base_height := 0.20
+        var glass_height := wall_height - base_height
+        var panel_width := span * 0.88
+        _box("BarsEndWallBase", _center(x, y, w, h, base_height * 0.5), Vector3(panel_width, base_height, 0.16), materials.wall, true, deg_to_rad(rotation))
+        _box("BarsEndGlass", _center(x, y, w, h, base_height + glass_height * 0.5), Vector3(panel_width, glass_height, 0.04), materials.glass, true, deg_to_rad(rotation))
         return
     var count: int = maxi(2, int(span / 0.28))
     for i in range(count + 1):
@@ -186,6 +192,11 @@ func _table(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var table_width := w * cell_meters * 0.86
     var table_depth := h * cell_meters * 0.72
     var center := _center(x, y, w, h)
+    # A 90-degree table in this map sits against the wall on the positive Z
+    # side. The wall mesh is centred in the next cell, so move the table beyond
+    # its occupied-cell centre while leaving a small visible clearance.
+    if is_equal_approx(fposmod(rotation, 360.0), 90.0):
+        center.z += 0.48 * cell_meters
     _box("MealTableTop", center + Vector3(0, 0.73, 0), Vector3(table_width, 0.10, table_depth), materials.furniture, true)
     for local_x in [-table_width * 0.38, table_width * 0.38]:
         var leg_pos := center + Vector3(local_x, 0.36, 0)
@@ -197,7 +208,13 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
     if tile == "partition": height = 1.45
     if tile == "cabinet": height = 1.1
     var size := Vector3(w * cell_meters * 0.72, height, h * cell_meters * 0.72)
-    _box(tile, _center(x, y, w, h, height * 0.5), size, materials.furniture, true, deg_to_rad(rotation))
+    var center := _center(x, y, w, h, height * 0.5)
+    # The toilet partition spans y=11..13 and is authored against the wall on
+    # its positive Z side. Match the table wall offset instead of leaving the
+    # shrunken furniture mesh floating near the occupied-cell centre.
+    if tile == "partition" and is_equal_approx(fposmod(rotation, 360.0), 0.0):
+        center.z += 0.48 * cell_meters
+    _box(tile, center, size, materials.furniture, true, deg_to_rad(rotation))
 
 func _toilet(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
