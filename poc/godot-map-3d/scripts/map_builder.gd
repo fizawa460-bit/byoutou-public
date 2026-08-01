@@ -208,7 +208,13 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
     if tile == "partition": height = 1.45
     if tile == "cabinet": height = 1.1
     var size := Vector3(w * cell_meters * 0.72, height, h * cell_meters * 0.72)
-    _box(tile, _center(x, y, w, h, height * 0.5), size, materials.furniture, true, deg_to_rad(rotation))
+    var center := _center(x, y, w, h, height * 0.5)
+    # The toilet partition spans y=11..13 and is authored against the wall on
+    # its positive Z side. Match the table wall offset instead of leaving the
+    # shrunken furniture mesh floating near the occupied-cell centre.
+    if tile == "partition" and is_equal_approx(fposmod(rotation, 360.0), 0.0):
+        center.z += 0.48 * cell_meters
+    _box(tile, center, size, materials.furniture, true, deg_to_rad(rotation))
 
 func _toilet(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
