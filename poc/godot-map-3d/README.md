@@ -26,8 +26,9 @@ Godot本体以外の有料／外部アセットは不要。床・壁・ドア・
 
 - JSONの1マスを既定1mへ変換し、`x`をGodotのX、`y`をZへ対応させる。
 - `width` / `height` がある配置は矩形寸法を維持し、未指定時は現行タイル定義の標準寸法を使う。
-- `floor`, `floorDark`, `wallTop`, `wallSide`, `door`, `doorSmall`, `window`, `peekWindow`, `bars`, `curtain`, `futon`, `table`, `partition`, `cabinet`, `toilet`, `sink`, `toiletPaperDispenser`, `rail`, `railEdge`, `mealHatch*` を変換する。
-- `toiletPaperDispenser` は壁埋込設備として扱い、患者側には紙の出口だけを表示する。JSONの `refill_side: staff_only` と `locked: true` は、交換口が職員側にのみある構造を示す。
+- `floor`, `floorDark`, `wallTop`, `wallSide`, `door`, `doorSmall`, `window`, `peekWindow`, `bars`, `curtain`, `futon`, `table`, `partition`, `cabinet`, `toiletSinkCombo`, `toiletPaperDispenser`, `rail`, `railEdge`, `mealHatch*` を変換する。
+- `toiletSinkCombo` は保護室向けの金属製便器・手洗い一体型設備を示す。JSONは3D形状ではなく、設備の種類と材質を渡す設計図として扱う。
+- `toiletPaperDispenser` は便器後方ではなく、便器に座ったときの横壁へ埋め込む。JSONの `side: toilet_lateral` と `refill: staff_side` は配置意図だけを3D側へ渡す。
 - 床、壁、ドア、鉄格子、主要家具に衝突判定を付ける。
 - `grime`, `shadow`, `mealTray` は2D装飾のため初期PoCでは無視する。
 - 未知のタイルは停止せず、画面左上に警告する。

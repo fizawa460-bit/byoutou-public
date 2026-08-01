@@ -70,8 +70,8 @@ func _build_placement(p: Dictionary) -> void:
         "futon": _futon(x, y, size.x, size.y)
         "table": _table(x, y, size.x, size.y, rotation)
         "partition", "cabinet": _furniture(tile, x, y, size.x, size.y, rotation)
-        "toilet": _toilet(x, y, size.x, size.y, rotation)
-        "sink": _sink(x, y, size.x, size.y, rotation)
+        "toiletSinkCombo": _toilet_sink_combo(x, y, size.x, size.y, rotation)
+        "toilet", "sink": _legacy_fixture(tile, x, y, size.x, size.y, rotation)
         "toiletPaperDispenser": _toilet_paper_dispenser(x, y, rotation)
         "rail": _rail(x, y, size.x, size.y, rotation, false)
         "railEdge": _rail(x, y, size.x, size.y, rotation, true)
@@ -85,7 +85,8 @@ func _placement_size(p: Dictionary, tile: String) -> Vector2:
     var defaults := {
         "door": Vector2(2, 1), "window": Vector2(9, 1), "curtain": Vector2(9, 1),
         "bars": Vector2(3, 1), "futon": Vector2(2, 3), "table": Vector2(1, 2),
-        "partition": Vector2(1, 2), "rail": Vector2(3, 1), "railEdge": Vector2(3, 1)
+        "partition": Vector2(1, 2), "toiletSinkCombo": Vector2(1, 2),
+        "rail": Vector2(3, 1), "railEdge": Vector2(3, 1)
     }
     var fallback: Vector2 = defaults.get(tile, Vector2.ONE)
     return Vector2(float(p.get("width", fallback.x)), float(p.get("height", fallback.y)))
@@ -119,6 +120,40 @@ func _box(name: String, position: Vector3, size: Vector3, material: Material, co
     var shape_node := CollisionShape3D.new()
     var shape := BoxShape3D.new()
     shape.size = size
+    shape_node.shape = shape
+    body.add_child(shape_node)
+    add_child(body)
+    return body
+
+func _cylinder(name: String, position: Vector3, size: Vector3, material: Material, rotation_y := 0.0, top_radius_ratio := 1.0) -> StaticBody3D:
+    generated_count += 1
+    var body := StaticBody3D.new()
+    body.name = name
+    body.position = position
+    body.rotation.y = rotation_y
+    body.collision_layer = 2
+    body.collision_mask = 0
+    body.set_meta("tile", str(_current_placement.get("tile", name)))
+    body.set_meta("part", name)
+    body.set_meta("map_x", float(_current_placement.get("x", 0)))
+    body.set_meta("map_y", float(_current_placement.get("y", 0)))
+    body.set_meta("map_width", float(_current_placement.get("width", 1)))
+    body.set_meta("map_height", float(_current_placement.get("height", 1)))
+    body.set_meta("map_rotation", float(_current_placement.get("rotation", 0)))
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := CylinderMesh.new()
+    mesh.height = size.y
+    mesh.bottom_radius = size.x * 0.5
+    mesh.top_radius = size.x * 0.5 * top_radius_ratio
+    mesh.radial_segments = 20
+    mesh.material = material
+    mesh_instance.mesh = mesh
+    mesh_instance.scale.z = size.z / size.x
+    body.add_child(mesh_instance)
+    var shape_node := CollisionShape3D.new()
+    var shape := CylinderShape3D.new()
+    shape.height = size.y
+    shape.radius = maxf(size.x, size.z) * 0.5
     shape_node.shape = shape
     body.add_child(shape_node)
     add_child(body)
@@ -217,24 +252,34 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
         center.z += 0.48 * cell_meters
     _box(tile, center, size, materials.furniture, true, deg_to_rad(rotation))
 
-func _toilet(x: float, y: float, w: float, h: float, rotation: float) -> void:
+func _toilet_sink_combo(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
-    _box("StainlessToiletBase", center + Vector3(0, 0.20, 0), Vector3(0.46, 0.40, 0.62), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("StainlessToiletRim", center + _rotated_offset(rotation, Vector3(0, 0.43, -0.08)), Vector3(0.52, 0.10, 0.62), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("StainlessToiletBack", center + _rotated_offset(rotation, Vector3(0, 0.62, 0.30)), Vector3(0.56, 0.72, 0.22), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("ToiletBowlOpening", center + _rotated_offset(rotation, Vector3(0, 0.49, -0.12)), Vector3(0.31, 0.015, 0.38), materials.fixture_dark, false, deg_to_rad(rotation))
+    var toilet_center := center + _rotated_offset(rotation, Vector3(0, 0, 0.38))
+    var sink_center := center + _rotated_offset(rotation, Vector3(0, 0, -0.43))
+    # One continuous security cabinet makes the fixture read as a manufactured
+    # toilet/sink unit rather than two unrelated boxes.
+    _box("ComboSecurityCabinet", center + Vector3(0, 0.48, 0), Vector3(0.62, 0.96, 1.18), materials.fixture_metal, true, deg_to_rad(rotation))
+    _cylinder("ComboToiletPedestal", toilet_center + Vector3(0, 0.24, 0), Vector3(0.48, 0.48, 0.58), materials.fixture_metal, deg_to_rad(rotation), 1.18)
+    _cylinder("ComboToiletRim", toilet_center + Vector3(0, 0.50, 0), Vector3(0.60, 0.10, 0.72), materials.fixture_metal, deg_to_rad(rotation))
+    _cylinder("ComboToiletOpening", toilet_center + Vector3(0, 0.558, 0), Vector3(0.40, 0.018, 0.50), materials.fixture_dark, deg_to_rad(rotation))
+    _box("ComboSinkDeck", sink_center + Vector3(0, 0.87, 0), Vector3(0.64, 0.16, 0.58), materials.fixture_metal, false, deg_to_rad(rotation))
+    _cylinder("ComboSinkBasin", sink_center + Vector3(0, 0.958, -0.02), Vector3(0.46, 0.018, 0.34), materials.fixture_dark, deg_to_rad(rotation))
+    _box("ComboSplashBack", sink_center + _rotated_offset(rotation, Vector3(0, 1.08, 0.25)), Vector3(0.64, 0.36, 0.08), materials.fixture_metal, false, deg_to_rad(rotation))
+    _box("ComboFaucet", sink_center + _rotated_offset(rotation, Vector3(0, 1.18, 0.04)), Vector3(0.08, 0.22, 0.08), materials.metal, false, deg_to_rad(rotation))
+    _box("ComboFlushButton", toilet_center + _rotated_offset(rotation, Vector3(0, 0.78, 0.34)), Vector3(0.10, 0.10, 0.025), materials.fixture_dark, false, deg_to_rad(rotation))
 
-func _sink(x: float, y: float, w: float, h: float, rotation: float) -> void:
+func _legacy_fixture(tile: String, x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
-    _box("StainlessSinkPedestal", center + Vector3(0, 0.36, 0), Vector3(0.24, 0.72, 0.24), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("StainlessSinkBasin", center + _rotated_offset(rotation, Vector3(0, 0.78, -0.06)), Vector3(0.72, 0.16, 0.54), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("StainlessSinkBack", center + _rotated_offset(rotation, Vector3(0, 0.93, 0.22)), Vector3(0.72, 0.32, 0.08), materials.fixture_metal, true, deg_to_rad(rotation))
-    _box("SinkBasinOpening", center + _rotated_offset(rotation, Vector3(0, 0.875, -0.08)), Vector3(0.48, 0.012, 0.30), materials.fixture_dark, false, deg_to_rad(rotation))
-    _box("SinkFaucet", center + _rotated_offset(rotation, Vector3(0, 1.06, 0.08)), Vector3(0.08, 0.22, 0.08), materials.metal, false, deg_to_rad(rotation))
+    if tile == "toilet":
+        _cylinder("LegacyToilet", center + Vector3(0, 0.32, 0), Vector3(0.54, 0.54, 0.66), materials.fixture_metal, deg_to_rad(rotation), 1.1)
+        _cylinder("LegacyToiletOpening", center + Vector3(0, 0.60, 0), Vector3(0.34, 0.018, 0.44), materials.fixture_dark, deg_to_rad(rotation))
+    else:
+        _box("LegacySink", center + Vector3(0, 0.78, 0), Vector3(0.68, 0.18, 0.52), materials.fixture_metal, true, deg_to_rad(rotation))
+        _cylinder("LegacySinkOpening", center + Vector3(0, 0.88, 0), Vector3(0.42, 0.018, 0.30), materials.fixture_dark, deg_to_rad(rotation))
 
 func _toilet_paper_dispenser(x: float, y: float, rotation: float) -> void:
-    # JSON records the wall construction: only a narrow paper outlet is exposed
-    # to the patient; the locked roll compartment is serviced from staff side.
+    # The JSON placement is deliberately lateral to the seated toilet, never
+    # behind it. Rotation 0 mounts the plate on the room-facing side of y=13.
     var center := _center(x, y, 1, 1, 0.76) + _rotated_offset(rotation, Vector3(0, 0, -0.43))
     _box("DispenserPatientPlate", center, Vector3(0.54, 0.42, 0.045), materials.fixture_metal, false, deg_to_rad(rotation))
     _box("DispenserPaperSlot", center + _rotated_offset(rotation, Vector3(0, -0.04, -0.028)), Vector3(0.34, 0.065, 0.018), materials.fixture_dark, false, deg_to_rad(rotation))
