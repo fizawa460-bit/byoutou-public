@@ -80,8 +80,17 @@
       sunlight: { maxDepthCells: .25 },
       castsShadow: false
     },
-    toilet: { name: "金属製トイレ", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
-    sink: { name: "金属製手洗い場", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
+    toiletSinkCombo: {
+      name: "金属製トイレ・手洗い一体型",
+      layer: "fixture",
+      w: 1,
+      h: 2,
+      draw: drawToiletSinkCombo,
+      rotations: [0, 90, 180, 270],
+      placementDefaults: { fixture_style: "security_toilet_sink_combo", material: "stainless_steel" }
+    },
+    toilet: { name: "金属製トイレ（単体）", layer: "fixture", w: 1, h: 1, draw: drawToilet, rotations: [0, 45, 90, 135] },
+    sink: { name: "金属製手洗い（単体）", layer: "fixture", w: 1, h: 1, draw: drawSink, rotations: [0, 45, 90, 135] },
     toiletPaperDispenser: {
       name: "壁埋込トイレットペーパー",
       layer: "fixture",
@@ -92,10 +101,8 @@
       castsShadow: false,
       placementDefaults: {
         mount: "recessed_wall",
-        patient_side: "paper_slot_only",
-        refill_side: "staff_only",
-        material: "stainless_steel",
-        locked: true
+        side: "toilet_lateral",
+        refill: "staff_side"
       }
     },
     mealTray: { name: "食事トレー", layer: "overlay", w: 1, h: 1, draw: drawMealTray, rotations: [0, 90, 180, 270] },
@@ -154,12 +161,11 @@
       {"tile":"shadow","x":0,"y":12,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":11,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":12,"layer":"overlay"},
-      {"tile":"toilet","x":10,"y":12,"layer":"fixture","rotation":90},
-      {"tile":"toiletPaperDispenser","x":11,"y":12,"layer":"fixture","rotation":270,"mount":"recessed_wall","patient_side":"paper_slot_only","refill_side":"staff_only","material":"stainless_steel","locked":true},
+      {"tile":"toiletSinkCombo","x":10,"y":11,"layer":"fixture","rotation":90,"width":1,"height":2,"fixture_style":"security_toilet_sink_combo","material":"stainless_steel"},
+      {"tile":"toiletPaperDispenser","x":10,"y":13,"layer":"fixture","rotation":0,"mount":"recessed_wall","side":"toilet_lateral","refill":"staff_side"},
       {"tile":"window","x":1,"y":0,"layer":"structure","width":10,"height":1},
       {"tile":"curtain","x":10,"y":0,"layer":"fixture","width":1,"height":1},
       {"tile":"curtain","x":1,"y":0,"layer":"fixture","width":1,"height":1},
-      {"tile":"sink","x":10,"y":11,"layer":"fixture","rotation":90},
       {"tile":"wallTop","x":11,"y":0,"layer":"structure"},
       {"tile":"wallTop","x":0,"y":0,"layer":"structure"},
       {"tile":"doorSmall","x":0,"y":2,"layer":"structure","rotation":90},
@@ -2065,43 +2071,31 @@
     g.fill();
     g.restore();
   }
+  function drawToiletSinkCombo(g, x, y, w, h) {
+    drawSink(g, x, y, w, h * .42);
+    drawToilet(g, x, y + h * .34, w, h * .66);
+  }
   function drawSink(g, x, y, w, h) {
     g.save();
-    g.shadowColor = "rgba(0,0,0,.58)";
-    g.shadowBlur = Math.max(5, w * .08);
-    g.shadowOffsetY = Math.max(2, h * .05);
     const steel = g.createLinearGradient(x, y, x + w, y);
     steel.addColorStop(0, "#4a4e4f");
-    steel.addColorStop(.2, "#c4c7c4");
-    steel.addColorStop(.48, "#717676");
-    steel.addColorStop(.76, "#d1d2ce");
+    steel.addColorStop(.22, "#c4c7c4");
+    steel.addColorStop(.52, "#717676");
     steel.addColorStop(1, "#4b4f50");
-    rect(g, x + w * .08, y + h * .12, w * .84, h * .76, steel, "#303334", Math.max(2, w * .04));
-    g.shadowColor = "transparent";
+    rect(g, x + w * .1, y + h * .08, w * .8, h * .84, steel, "#303334", Math.max(2, w * .04));
     g.beginPath();
-    g.ellipse(x + w * .5, y + h * .55, w * .31, h * .24, 0, 0, Math.PI * 2);
-    g.fillStyle = "#333a3c";
+    g.ellipse(x + w * .5, y + h * .53, w * .3, h * .22, 0, 0, Math.PI * 2);
+    g.fillStyle = "#252b2d";
     g.fill();
-    g.strokeStyle = "#e0e1dd";
+    g.strokeStyle = "#d8d9d4";
     g.lineWidth = Math.max(2, w * .035);
-    g.stroke();
-    g.beginPath();
-    g.arc(x + w * .5, y + h * .56, Math.max(2, w * .04), 0, Math.PI * 2);
-    g.fillStyle = "#171b1c";
-    g.fill();
-    g.strokeStyle = "#929795";
     g.stroke();
     g.strokeStyle = "#d7d9d5";
     g.lineWidth = Math.max(3, w * .07);
-    g.lineCap = "round";
     g.beginPath();
-    g.moveTo(x + w * .5, y + h * .2);
-    g.lineTo(x + w * .5, y + h * .34);
-    g.lineTo(x + w * .6, y + h * .39);
+    g.moveTo(x + w * .5, y + h * .14);
+    g.lineTo(x + w * .5, y + h * .32);
     g.stroke();
-    g.fillStyle = "#858a89";
-    g.fillRect(x + w * .22, y + h * .2, w * .1, h * .08);
-    g.fillRect(x + w * .68, y + h * .2, w * .1, h * .08);
     g.restore();
   }
   function drawToiletPaperDispenser(g, x, y, w, h) {
