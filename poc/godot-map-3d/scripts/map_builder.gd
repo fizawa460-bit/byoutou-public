@@ -294,7 +294,7 @@ func _visual_bounds(root: Node3D) -> AABB:
     var root_inverse := root.global_transform.affine_inverse()
     var nodes: Array[Node] = [root]
     while not nodes.is_empty():
-        var node := nodes.pop_back()
+        var node: Node = nodes.pop_back()
         nodes.append_array(node.get_children())
         if node is MeshInstance3D and node.mesh:
             var local_bounds: AABB = (root_inverse * node.global_transform) * node.get_aabb()
