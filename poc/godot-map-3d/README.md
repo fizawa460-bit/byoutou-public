@@ -28,7 +28,7 @@ Godot本体以外の有料／外部アセットは不要。床・壁・ドア・
 - `width` / `height` がある配置は矩形寸法を維持し、未指定時は現行タイル定義の標準寸法を使う。
 - `floor`, `floorDark`, `wallTop`, `wallSide`, `door`, `doorSmall`, `window`, `peekWindow`, `bars`, `curtain`, `futon`, `table`, `partition`, `cabinet`, `toiletSinkCombo`, `toiletPaperDispenser`, `rail`, `railEdge`, `mealHatch*` を変換する。
 - `toiletSinkCombo` は保護室向けの金属製便器・手洗い一体型設備を示す。JSONは3D形状ではなく、設備の種類と材質を渡す設計図として扱う。
-- CC0の原本ZIPは `assets/source_models/toilet_sink/` で管理する。`bash prepare_models.sh` で原本を一時展開し、Blenderのバッチ処理で `assets/models/toilet_sink/toilet_sink.glb` へ変換してからGodotへ渡す。ActionsではWeb書き出し前に自動実行し、読込失敗時のみ軽量な簡易形状へ戻す。
+- CC0モデルはOpenGameArtの「Toilets」から便器1個と洗面台1個だけを `tools/curate_toilet_glb.py` で抽出する。`bash prepare_models.sh` が原本を取得し、`assets/models/toilet_sink/toilet_sink.glb` へ配置してGodotへ渡す。読込失敗時のみ軽量な簡易形状へ戻す。原作はCC0（https://opengameart.org/content/toilets）。
 - `toiletPaperDispenser` は便器後方ではなく、便器に座ったときの横壁へ埋め込む。JSONの `side: toilet_lateral` と `refill: staff_side` は配置意図だけを3D側へ渡す。
 - 床、壁、ドア、鉄格子、主要家具に衝突判定を付ける。
 - `grime`, `shadow`, `mealTray` は2D装飾のため初期PoCでは無視する。
