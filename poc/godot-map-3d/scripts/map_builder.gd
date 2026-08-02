@@ -8,6 +8,8 @@ signal build_progress(stage: String)
 @export var wall_height := 2.7
 @export var preview_hour := 12.0
 
+const TOILET_SINK_MODEL_PATH := "res://assets/models/toilet_sink/toilet_sink.blend"
+
 var warnings := PackedStringArray()
 var materials: Dictionary = {}
 var generated_count := 0
@@ -85,7 +87,7 @@ func _placement_size(p: Dictionary, tile: String) -> Vector2:
     var defaults := {
         "door": Vector2(2, 1), "window": Vector2(9, 1), "curtain": Vector2(9, 1),
         "bars": Vector2(3, 1), "futon": Vector2(2, 3), "table": Vector2(1, 2),
-        "partition": Vector2(1, 2), "toiletSinkCombo": Vector2(1, 2),
+        "partition": Vector2(1, 2), "toiletSinkCombo": Vector2.ONE,
         "rail": Vector2(3, 1), "railEdge": Vector2(3, 1)
     }
     var fallback: Vector2 = defaults.get(tile, Vector2.ONE)
@@ -253,6 +255,54 @@ func _furniture(tile: String, x: float, y: float, w: float, h: float, rotation: 
     _box(tile, center, size, materials.furniture, true, deg_to_rad(rotation))
 
 func _toilet_sink_combo(x: float, y: float, w: float, h: float, rotation: float) -> void:
+    if ResourceLoader.exists(TOILET_SINK_MODEL_PATH):
+        var resource := load(TOILET_SINK_MODEL_PATH)
+        if resource is PackedScene:
+            _place_toilet_sink_model(resource, x, y, w, h, rotation)
+            return
+    warnings.append("一体型トイレの実モデルを読み込めないため簡易形状を表示します")
+    _toilet_sink_combo_fallback(x, y, w, h, rotation)
+
+func _place_toilet_sink_model(scene: PackedScene, x: float, y: float, w: float, h: float, rotation: float) -> void:
+    var holder := StaticBody3D.new()
+    holder.name = "ToiletSinkCombo"
+    holder.position = _center(x, y, w, h)
+    holder.rotation.y = deg_to_rad(rotation)
+    holder.collision_layer = 3
+    holder.collision_mask = 0
+    var model := scene.instantiate()
+    holder.add_child(model)
+    add_child(holder)
+    var bounds := _visual_bounds(model)
+    if bounds.size.length_squared() > 0.0:
+        var target_size := Vector3(w * cell_meters * 0.88, 1.25, h * cell_meters * 0.88)
+        var scale_factor: float = minf(target_size.x / bounds.size.x, minf(target_size.y / bounds.size.y, target_size.z / bounds.size.z))
+        model.scale = Vector3.ONE * scale_factor
+        var scaled_center := bounds.get_center() * scale_factor
+        model.position = Vector3(-scaled_center.x, -bounds.position.y * scale_factor, -scaled_center.z)
+    var collision := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = Vector3(w * cell_meters * 0.88, 1.25, h * cell_meters * 0.88)
+    collision.position.y = shape.size.y * 0.5
+    collision.shape = shape
+    holder.add_child(collision)
+    generated_count += 1
+
+func _visual_bounds(root: Node3D) -> AABB:
+    var result := AABB()
+    var has_bounds := false
+    var root_inverse := root.global_transform.affine_inverse()
+    var nodes: Array[Node] = [root]
+    while not nodes.is_empty():
+        var node := nodes.pop_back()
+        nodes.append_array(node.get_children())
+        if node is MeshInstance3D and node.mesh:
+            var local_bounds: AABB = (root_inverse * node.global_transform) * node.get_aabb()
+            result = result.merge(local_bounds) if has_bounds else local_bounds
+            has_bounds = true
+    return result
+
+func _toilet_sink_combo_fallback(x: float, y: float, w: float, h: float, rotation: float) -> void:
     var center := _center(x, y, w, h)
     var toilet_center := center + _rotated_offset(rotation, Vector3(0, 0, 0.38))
     var sink_center := center + _rotated_offset(rotation, Vector3(0, 0, -0.43))
