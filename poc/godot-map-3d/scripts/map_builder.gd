@@ -8,7 +8,7 @@ signal build_progress(stage: String)
 @export var wall_height := 2.7
 @export var preview_hour := 12.0
 
-const TOILET_SINK_MODEL_PATH := "res://assets/models/toilet_sink/toilet_sink.blend"
+const TOILET_SINK_MODEL_PATH := "res://assets/models/toilet_sink/toilet_sink.glb"
 
 var warnings := PackedStringArray()
 var materials: Dictionary = {}
