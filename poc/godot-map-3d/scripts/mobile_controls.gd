@@ -99,7 +99,7 @@ func _input(event: InputEvent) -> void:
             _update_move(event.position)
             queue_redraw()
         elif event.index == _look_touch:
-            var delta := event.position - _look_last
+            var delta: Vector2 = event.position - _look_last
             _look_delta += delta
             _look_last = event.position
             if not _look_input_reported and delta.length() > 1.0:
