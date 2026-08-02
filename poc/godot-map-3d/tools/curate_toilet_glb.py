@@ -2,6 +2,7 @@
 """Keep one CC0 toilet and one sink from OpenGameArt's Toilets.glb."""
 
 import json
+import copy
 import struct
 import sys
 from pathlib import Path
@@ -38,7 +39,29 @@ def main() -> None:
     # toilet faces +Z; the wall-mounted sink sits directly behind it.
     nodes[toilet]["translation"] = [0.0, 0.0, 0.18]
     nodes[sink]["translation"] = [0.0, 0.80, -0.42]
-    document["scenes"] = [{"name": "ToiletSinkCombo", "nodes": [toilet, sink]}]
+
+    # Godot imports every node present in the GLB, even when it is not a root
+    # of the active glTF scene. Remove the nine unselected gallery fixtures
+    # entirely so they can never pollute the runtime AABB.
+    selected = []
+    def collect(index: int) -> None:
+        if index in selected:
+            return
+        selected.append(index)
+        for child in nodes[index].get("children", []):
+            collect(child)
+
+    collect(toilet)
+    collect(sink)
+    remap = {old: new for new, old in enumerate(selected)}
+    curated_nodes = []
+    for old in selected:
+        node = copy.deepcopy(nodes[old])
+        if "children" in node:
+            node["children"] = [remap[child] for child in node["children"]]
+        curated_nodes.append(node)
+    document["nodes"] = curated_nodes
+    document["scenes"] = [{"name": "ToiletSinkCombo", "nodes": [remap[toilet], remap[sink]]}]
     document["scene"] = 0
 
     encoded_json = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode()
