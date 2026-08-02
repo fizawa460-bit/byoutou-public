@@ -277,6 +277,11 @@ func _place_toilet_sink_model(scene: PackedScene, x: float, y: float, w: float, 
     if bounds.size.length_squared() > 0.0:
         var target_size := Vector3(w * cell_meters * 0.88, 1.25, h * cell_meters * 0.88)
         var scale_factor: float = minf(target_size.x / bounds.size.x, minf(target_size.y / bounds.size.y, target_size.z / bounds.size.z))
+        # This Blender scene contains distant helper geometry in its visual
+        # bounds. The raw fit therefore makes the actual fixture toy-sized.
+        # Calibrate the visible toilet/sink body against the one-metre map cell.
+        const FIXTURE_VISUAL_SCALE_CORRECTION := 6.0
+        scale_factor *= FIXTURE_VISUAL_SCALE_CORRECTION
         model.scale = Vector3.ONE * scale_factor
         var scaled_center := bounds.get_center() * scale_factor
         model.position = Vector3(-scaled_center.x, -bounds.position.y * scale_factor, -scaled_center.z)
