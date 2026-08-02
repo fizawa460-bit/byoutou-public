@@ -267,24 +267,32 @@ func _place_toilet_sink_model(scene: PackedScene, x: float, y: float, w: float, 
     var holder := StaticBody3D.new()
     holder.name = "ToiletSinkCombo"
     holder.position = _center(x, y, w, h)
-    holder.rotation.y = deg_to_rad(rotation)
+    # Face the playable room so a person can approach and sit normally.
+    holder.rotation.y = deg_to_rad(rotation + 180.0)
     holder.collision_layer = 3
     holder.collision_mask = 0
     var model := scene.instantiate()
     holder.add_child(model)
     add_child(holder)
+    # Remove the large, thin Blender helper plate before measuring the fixture.
+    var removed_helpers := _hide_oversized_helper_meshes(model)
     var bounds := _visual_bounds(model)
     if bounds.size.length_squared() > 0.0:
-        var target_size := Vector3(w * cell_meters * 0.88, 1.25, h * cell_meters * 0.88)
-        var scale_factor: float = minf(target_size.x / bounds.size.x, minf(target_size.y / bounds.size.y, target_size.z / bounds.size.z))
-        # This Blender scene contains distant helper geometry in its visual
-        # bounds. The raw fit therefore makes the actual fixture toy-sized.
-        # Calibrate the visible toilet/sink body against the one-metre map cell.
-        const FIXTURE_VISUAL_SCALE_CORRECTION := 6.0
-        scale_factor *= FIXTURE_VISUAL_SCALE_CORRECTION
+        const FIXTURE_HEIGHT_METERS := 1.0
+        var footprint := Vector2(w * cell_meters * 0.92, h * cell_meters * 0.92)
+        var height_scale := FIXTURE_HEIGHT_METERS / bounds.size.y
+        var footprint_scale: float = minf(footprint.x / bounds.size.x, footprint.y / bounds.size.z)
+        var scale_factor: float = minf(height_scale, footprint_scale)
         model.scale = Vector3.ONE * scale_factor
         var scaled_center := bounds.get_center() * scale_factor
         model.position = Vector3(-scaled_center.x, -bounds.position.y * scale_factor, -scaled_center.z)
+        print("TOILET_SINK_DIMENSIONS height=%.3f width=%.3f depth=%.3f helpers_removed=%d facing_rotation=%.1f" % [
+            bounds.size.y * scale_factor,
+            bounds.size.x * scale_factor,
+            bounds.size.z * scale_factor,
+            removed_helpers,
+            rotation + 180.0
+        ])
     var collision := CollisionShape3D.new()
     var shape := BoxShape3D.new()
     shape.size = Vector3(w * cell_meters * 0.88, 1.25, h * cell_meters * 0.88)
@@ -292,6 +300,31 @@ func _place_toilet_sink_model(scene: PackedScene, x: float, y: float, w: float, 
     collision.shape = shape
     holder.add_child(collision)
     generated_count += 1
+
+func _hide_oversized_helper_meshes(root: Node3D) -> int:
+    var meshes: Array[MeshInstance3D] = []
+    var lengths: Array[float] = []
+    var nodes: Array[Node] = [root]
+    while not nodes.is_empty():
+        var node: Node = nodes.pop_back()
+        nodes.append_array(node.get_children())
+        if node is MeshInstance3D and node.mesh:
+            meshes.append(node)
+            lengths.append(node.get_aabb().size.length())
+    if meshes.size() < 2:
+        return 0
+    lengths.sort()
+    var median_length: float = lengths[lengths.size() / 2]
+    var removed := 0
+    for mesh in meshes:
+        var size := mesh.get_aabb().size.abs()
+        var longest := maxf(size.x, maxf(size.y, size.z))
+        var shortest := minf(size.x, minf(size.y, size.z))
+        if longest > median_length * 4.0 and shortest < longest * 0.08:
+            mesh.visible = false
+            removed += 1
+            print("TOILET_SINK_HELPER_REMOVED name=%s size=%s" % [mesh.name, size])
+    return removed
 
 func _visual_bounds(root: Node3D) -> AABB:
     var result := AABB()
