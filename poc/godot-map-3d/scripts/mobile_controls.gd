@@ -45,6 +45,15 @@ func consume_look_delta() -> Vector2:
     _look_delta = Vector2.ZERO
     return value
 
+func _stick_center(viewport_size: Vector2) -> Vector2:
+    return Vector2(minf(115.0, viewport_size.x * 0.22), viewport_size.y - 115.0)
+
+func _update_move_position(position: Vector2) -> void:
+    _move_position = _move_origin + (position - _move_origin).limit_length(stick_radius)
+    if not _move_input_reported and get_move_vector().length() > 0.1:
+        _move_input_reported = true
+        print("MOBILE_MOVE_INPUT_DETECTED")
+
 func _input(event: InputEvent) -> void:
     if not _touch_enabled or inspection_mode:
         return
@@ -56,8 +65,11 @@ func _input(event: InputEvent) -> void:
                 # focus. A fresh left-side press is authoritative and reclaims the
                 # movement slot instead of leaving a stale touch ID locked forever.
                 _move_touch = event.index
-                _move_origin = event.position
-                _move_position = event.position
+                # The stick is drawn at a fixed position, so touching its edge must
+                # start movement immediately instead of making the touched point a
+                # new zero-position that only reacts after a second drag event.
+                _move_origin = _stick_center(viewport_size)
+                _update_move_position(event.position)
             elif _look_touch < 0 or _look_touch == event.index:
                 _look_touch = event.index
                 _look_last = event.position
@@ -70,10 +82,7 @@ func _input(event: InputEvent) -> void:
         queue_redraw()
     elif event is InputEventScreenDrag:
         if event.index == _move_touch:
-            _move_position = _move_origin + (event.position - _move_origin).limit_length(stick_radius)
-            if not _move_input_reported and get_move_vector().length() > 0.1:
-                _move_input_reported = true
-                print("MOBILE_MOVE_INPUT_DETECTED")
+            _update_move_position(event.position)
             queue_redraw()
         elif event.index == _look_touch:
             _look_delta += event.position - _look_last
@@ -83,7 +92,7 @@ func _draw() -> void:
     if not _touch_enabled or inspection_mode:
         return
     var viewport_size := get_viewport_rect().size
-    var hint_center := Vector2(minf(115.0, viewport_size.x * 0.22), viewport_size.y - 115.0)
+    var hint_center := _stick_center(viewport_size)
     var base := _move_origin if _move_touch >= 0 else hint_center
     var knob := _move_position if _move_touch >= 0 else hint_center
     draw_circle(base, stick_radius, Color(0.08, 0.09, 0.11, 0.38))
