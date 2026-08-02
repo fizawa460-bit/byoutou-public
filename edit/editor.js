@@ -84,7 +84,7 @@
       name: "金属製トイレ・手洗い一体型",
       layer: "fixture",
       w: 1,
-      h: 2,
+      h: 1,
       draw: drawToiletSinkCombo,
       rotations: [0, 90, 180, 270],
       placementDefaults: { fixture_style: "security_toilet_sink_combo", material: "stainless_steel" }
@@ -161,7 +161,7 @@
       {"tile":"shadow","x":0,"y":12,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":11,"layer":"overlay"},
       {"tile":"shadow","x":11,"y":12,"layer":"overlay"},
-      {"tile":"toiletSinkCombo","x":10,"y":11,"layer":"fixture","rotation":90,"width":1,"height":2,"fixture_style":"security_toilet_sink_combo","material":"stainless_steel"},
+      {"tile":"toiletSinkCombo","x":10,"y":12,"layer":"fixture","rotation":90,"width":1,"height":1,"fixture_style":"security_toilet_sink_combo","material":"stainless_steel"},
       {"tile":"toiletPaperDispenser","x":10,"y":13,"layer":"fixture","rotation":0,"mount":"recessed_wall","side":"toilet_lateral","refill":"staff_side"},
       {"tile":"window","x":1,"y":0,"layer":"structure","width":10,"height":1},
       {"tile":"curtain","x":10,"y":0,"layer":"fixture","width":1,"height":1},

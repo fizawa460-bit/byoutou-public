@@ -245,7 +245,7 @@
       "layer": "fixture",
       "rotation": 90,
       "width": 1,
-      "height": 2,
+      "height": 1,
       "fixture_style": "security_toilet_sink_combo",
       "material": "stainless_steel"
     },

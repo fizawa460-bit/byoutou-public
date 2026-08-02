@@ -28,6 +28,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Blender for Godot model import
+        run: sudo apt-get update && sudo apt-get install -y blender
+
+      - name: Prepare CC0 source models
+        run: bash poc/godot-map-3d/prepare_models.sh
+
       - name: Install Godot and export templates
         uses: chickensoft-games/setup-godot@v2
         with:
@@ -80,6 +86,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Blender for Godot model import
+        run: sudo apt-get update && sudo apt-get install -y blender
+
+      - name: Prepare CC0 source models
+        run: bash poc/godot-map-3d/prepare_models.sh
 
       - name: Install Godot and export templates
         uses: chickensoft-games/setup-godot@v2
