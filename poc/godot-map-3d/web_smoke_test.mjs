@@ -28,18 +28,14 @@ try {
   const cdp = await context.newCDPSession(page);
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: 120, y: 590, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
-  });
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [{ x: 120, y: 500, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
+    touchPoints: [{ x: 115, y: 530, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
   });
   await page.waitForTimeout(500);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 
   await page.screenshot({ path: "build/web-smoke.png" });
   if (!messages.some((message) => message.includes("MOBILE_MOVE_INPUT_DETECTED"))) {
-    throw new Error(`Left-side touch did not reach the movement stick. Browser log:\n${messages.join("\n")}`);
+    throw new Error(`Pressing the visible left stick did not start movement. Browser log:\n${messages.join("\n")}`);
   }
 } finally {
   await browser.close();
