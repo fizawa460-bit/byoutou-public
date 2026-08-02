@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Blender for model conversion
-        run: sudo apt-get update && sudo apt-get install -y blender
+        run: sudo apt-get update && sudo apt-get install -y blender python3-numpy
 
       - name: Convert CC0 source models to GLB
         run: bash poc/godot-map-3d/prepare_models.sh
@@ -88,7 +88,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Blender for model conversion
-        run: sudo apt-get update && sudo apt-get install -y blender
+        run: sudo apt-get update && sudo apt-get install -y blender python3-numpy
 
       - name: Convert CC0 source models to GLB
         run: bash poc/godot-map-3d/prepare_models.sh
