@@ -24,6 +24,15 @@ try {
   if (!messages.some((message) => message.includes("MAP_BUILD_SUCCESS"))) {
     throw new Error(`Web build did not generate the map. Browser log:\n${messages.join("\n")}`);
   }
+  const fixtureDimensions = messages.find((message) => message.includes("TOILET_SINK_DIMENSIONS"));
+  if (!fixtureDimensions) {
+    throw new Error(`CC0 toilet/sink model was not loaded. Browser log:\n${messages.join("\n")}`);
+  }
+  const height = Number(fixtureDimensions.match(/height=([0-9.]+)/)?.[1]);
+  if (!Number.isFinite(height) || height < 0.95 || height > 1.01) {
+    throw new Error(`Toilet/sink height is outside human scale: ${fixtureDimensions}`);
+  }
+  console.log(fixtureDimensions);
 
   const cdp = await context.newCDPSession(page);
   const leftStart = { x: 115, y: 530, radiusX: 12, radiusY: 12, force: 1, id: 1 };
