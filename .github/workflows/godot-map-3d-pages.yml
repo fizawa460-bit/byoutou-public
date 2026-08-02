@@ -28,10 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Blender for Godot model import
+      - name: Install Blender for model conversion
         run: sudo apt-get update && sudo apt-get install -y blender
 
-      - name: Prepare CC0 source models
+      - name: Convert CC0 source models to GLB
         run: bash poc/godot-map-3d/prepare_models.sh
 
       - name: Install Godot and export templates
@@ -59,7 +59,7 @@ jobs:
       - name: Export Web build
         run: |
           mkdir -p poc/godot-map-3d/build/web
-          godot --headless --path poc/godot-map-3d --export-release Web build/web/index.html
+          timeout 5m godot --headless --path poc/godot-map-3d --export-release Web build/web/index.html
 
       - name: Install browser test dependencies
         working-directory: poc/godot-map-3d
@@ -87,10 +87,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Blender for Godot model import
+      - name: Install Blender for model conversion
         run: sudo apt-get update && sudo apt-get install -y blender
 
-      - name: Prepare CC0 source models
+      - name: Convert CC0 source models to GLB
         run: bash poc/godot-map-3d/prepare_models.sh
 
       - name: Install Godot and export templates
@@ -105,7 +105,7 @@ jobs:
         run: |
           release_dir="poc/godot-map-3d/build/web/releases/${GITHUB_SHA}"
           mkdir -p "$release_dir"
-          godot --headless --path poc/godot-map-3d --export-release Web "build/web/releases/${GITHUB_SHA}/index.html"
+          timeout 5m godot --headless --path poc/godot-map-3d --export-release Web "build/web/releases/${GITHUB_SHA}/index.html"
           printf '%s\n' '<!doctype html>' '<meta charset="utf-8">' '<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">' '<meta http-equiv="Pragma" content="no-cache">' '<meta http-equiv="Expires" content="0">' "<meta http-equiv=\"refresh\" content=\"0; url=releases/${GITHUB_SHA}/\">" "<script>location.replace('releases/${GITHUB_SHA}/'+location.search+location.hash)</script>" > poc/godot-map-3d/build/web/index.html
 
       - name: Configure Pages
