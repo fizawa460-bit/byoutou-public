@@ -65,11 +65,10 @@ func _input(event: InputEvent) -> void:
                 # focus. A fresh left-side press is authoritative and reclaims the
                 # movement slot instead of leaving a stale touch ID locked forever.
                 _move_touch = event.index
-                # The stick is drawn at a fixed position, so touching its edge must
-                # start movement immediately instead of making the touched point a
-                # new zero-position that only reacts after a second drag event.
-                _move_origin = _stick_center(viewport_size)
-                _update_move_position(event.position)
+                # Floating stick: the first pressed point on the left half is
+                # the movement origin, matching where the player's thumb lands.
+                _move_origin = event.position
+                _move_position = event.position
             elif _look_touch < 0 or _look_touch == event.index:
                 _look_touch = event.index
                 _look_last = event.position
@@ -92,10 +91,8 @@ func _draw() -> void:
     if not _touch_enabled or inspection_mode:
         return
     var viewport_size := get_viewport_rect().size
-    var hint_center := _stick_center(viewport_size)
-    var base := _move_origin if _move_touch >= 0 else hint_center
-    var knob := _move_position if _move_touch >= 0 else hint_center
-    draw_circle(base, stick_radius, Color(0.08, 0.09, 0.11, 0.38))
-    draw_arc(base, stick_radius, 0.0, TAU, 48, Color(0.9, 0.9, 0.86, 0.55), 3.0)
-    draw_circle(knob, 30.0, Color(0.85, 0.85, 0.8, 0.48))
+    if _move_touch >= 0:
+        draw_circle(_move_origin, stick_radius, Color(0.08, 0.09, 0.11, 0.38))
+        draw_arc(_move_origin, stick_radius, 0.0, TAU, 48, Color(0.9, 0.9, 0.86, 0.55), 3.0)
+        draw_circle(_move_position, 30.0, Color(0.85, 0.85, 0.8, 0.48))
     draw_string(ThemeDB.fallback_font, Vector2(viewport_size.x - 180.0, viewport_size.y - 42.0), "Swipe right side: look", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.9, 0.9, 0.86, 0.62))
