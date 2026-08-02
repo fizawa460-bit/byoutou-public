@@ -26,21 +26,40 @@ try {
   }
 
   const cdp = await context.newCDPSession(page);
+  const leftStart = { x: 115, y: 530, radiusX: 12, radiusY: 12, force: 1, id: 1 };
+  const leftDrag = { ...leftStart, x: 185 };
+  const rightStart = { x: 1040, y: 420, radiusX: 12, radiusY: 12, force: 1, id: 2 };
+  const rightDrag = { ...rightStart, x: 1090 };
+
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: 115, y: 530, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
+    touchPoints: [leftStart],
   });
   await page.waitForTimeout(100);
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchMove",
-    touchPoints: [{ x: 175, y: 530, radiusX: 12, radiusY: 12, force: 1, id: 1 }],
+    touchPoints: [leftDrag],
+  });
+  await page.waitForTimeout(100);
+
+  // Add and drag a second finger while the movement finger remains held.
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [leftDrag, rightStart],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [leftDrag, rightDrag],
   });
   await page.waitForTimeout(500);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 
   await page.screenshot({ path: "build/web-smoke.png" });
   if (!messages.some((message) => message.includes("MOBILE_MOVE_INPUT_DETECTED"))) {
-    throw new Error(`Dragging from a left-side touch origin did not start movement. Browser log:\n${messages.join("\n")}`);
+    throw new Error(`Dynamic left joystick did not produce movement. Browser log:\n${messages.join("\n")}`);
+  }
+  if (!messages.some((message) => message.includes("MOBILE_LOOK_INPUT_DETECTED"))) {
+    throw new Error(`Right-side look did not work while movement was held. Browser log:\n${messages.join("\n")}`);
   }
 } finally {
   await browser.close();
