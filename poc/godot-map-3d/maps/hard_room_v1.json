@@ -240,7 +240,7 @@
     },
     {
       "tile": "toiletSinkCombo",
-      "x": 10.5,
+      "x": 10,
       "y": 11,
       "layer": "fixture",
       "rotation": 90,
